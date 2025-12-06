@@ -589,7 +589,7 @@ export async function listLecturerClasses(
     })
   );
 
-  return sessions.map(mapSession);
+  return (sessions as any[]).map(mapSession);
 }
 
 /**

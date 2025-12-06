@@ -24,7 +24,7 @@ export async function closeOverdueAssignments(): Promise<number> {
     })
   );
 
-  return result.count;
+  return (result as any).count;
 }
 
 export interface CreateAssignmentInput {
@@ -151,26 +151,26 @@ export async function getLecturerAssignments(lecturerId: string): Promise<Assign
     })
   );
 
-  return assignments.map((assignment) => ({
+  return (assignments as any[]).map((assignment: any) => ({
     id: assignment.id,
     courseId: assignment.courseId,
-    courseCode: assignment.course.code,
-    courseTitle: assignment.course.title,
+    courseCode: assignment.course?.code,
+    courseTitle: assignment.course?.title,
     lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
+    lecturerName: assignment.lecturer?.name,
     sessionId: assignment.sessionId,
-    sessionName: assignment.session.name,
+    sessionName: assignment.session?.name,
     title: assignment.title,
     description: assignment.description || undefined,
     instructions: assignment.instructions || undefined,
-    dueDate: assignment.dueDate.toISOString(),
+    dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
     maxScore: Number(assignment.maxScore),
     attachments: assignment.attachments,
     status: assignment.status,
-    submissionCount: assignment.submissions.length,
-    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
-    createdAt: assignment.createdAt.toISOString(),
-    updatedAt: assignment.updatedAt.toISOString(),
+    submissionCount: (assignment.submissions as any[])?.length || 0,
+    gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
+    createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
+    updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
   }));
 }
 
@@ -224,26 +224,26 @@ export async function getCourseAssignments(courseId: string, sessionId: string):
     })
   );
 
-  return assignments.map((assignment) => ({
+  return (assignments as any[]).map((assignment: any) => ({
     id: assignment.id,
     courseId: assignment.courseId,
-    courseCode: assignment.course.code,
-    courseTitle: assignment.course.title,
+    courseCode: assignment.course?.code,
+    courseTitle: assignment.course?.title,
     lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
+    lecturerName: assignment.lecturer?.name,
     sessionId: assignment.sessionId,
-    sessionName: assignment.session.name,
+    sessionName: assignment.session?.name,
     title: assignment.title,
     description: assignment.description || undefined,
     instructions: assignment.instructions || undefined,
-    dueDate: assignment.dueDate.toISOString(),
+    dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
     maxScore: Number(assignment.maxScore),
     attachments: assignment.attachments,
     status: assignment.status,
-    submissionCount: assignment.submissions.length,
-    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
-    createdAt: assignment.createdAt.toISOString(),
-    updatedAt: assignment.updatedAt.toISOString(),
+    submissionCount: (assignment.submissions as any[])?.length || 0,
+    gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
+    createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
+    updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
   }));
 }
 
@@ -301,20 +301,20 @@ export async function getAssignmentById(assignmentId: string): Promise<Assignmen
     courseCode: assignment.course.code,
     courseTitle: assignment.course.title,
     lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
+    lecturerName: assignment.lecturer?.name,
     sessionId: assignment.sessionId,
-    sessionName: assignment.session.name,
+    sessionName: assignment.session?.name,
     title: assignment.title,
     description: assignment.description || undefined,
     instructions: assignment.instructions || undefined,
-    dueDate: assignment.dueDate.toISOString(),
+    dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
     maxScore: Number(assignment.maxScore),
     attachments: assignment.attachments,
     status: assignment.status,
-    submissionCount: assignment.submissions.length,
-    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
-    createdAt: assignment.createdAt.toISOString(),
-    updatedAt: assignment.updatedAt.toISOString(),
+    submissionCount: (assignment.submissions as any[])?.length || 0,
+    gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
+    createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
+    updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
   };
 }
 
@@ -393,25 +393,26 @@ export async function createAssignment(lecturerId: string, input: CreateAssignme
     })
   );
 
+  const a = assignment as any;
   return {
-    id: assignment.id,
-    courseId: assignment.courseId,
-    courseCode: assignment.course.code,
-    courseTitle: assignment.course.title,
-    lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
-    sessionId: assignment.sessionId,
-    sessionName: assignment.session.name,
-    title: assignment.title,
-    description: assignment.description || undefined,
-    instructions: assignment.instructions || undefined,
-    dueDate: assignment.dueDate.toISOString(),
-    maxScore: Number(assignment.maxScore),
-    attachments: assignment.attachments,
-    status: assignment.status,
+    id: a.id,
+    courseId: a.courseId,
+    courseCode: a.course?.code,
+    courseTitle: a.course?.title,
+    lecturerId: a.lecturerId,
+    lecturerName: a.lecturer?.name,
+    sessionId: a.sessionId,
+    sessionName: a.session?.name,
+    title: a.title,
+    description: a.description || undefined,
+    instructions: a.instructions || undefined,
+    dueDate: a.dueDate?.toISOString?.() || a.dueDate,
+    maxScore: Number(a.maxScore),
+    attachments: a.attachments,
+    status: a.status,
     submissionCount: 0,
     gradedCount: 0,
-    createdAt: assignment.createdAt.toISOString(),
+    createdAt: a.createdAt?.toISOString?.() || a.createdAt,
     updatedAt: assignment.updatedAt.toISOString(),
   };
 }
@@ -496,20 +497,20 @@ export async function updateAssignment(
     courseCode: assignment.course.code,
     courseTitle: assignment.course.title,
     lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
+    lecturerName: assignment.lecturer?.name,
     sessionId: assignment.sessionId,
-    sessionName: assignment.session.name,
+    sessionName: assignment.session?.name,
     title: assignment.title,
     description: assignment.description || undefined,
     instructions: assignment.instructions || undefined,
-    dueDate: assignment.dueDate.toISOString(),
+    dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
     maxScore: Number(assignment.maxScore),
     attachments: assignment.attachments,
     status: assignment.status,
-    submissionCount: assignment.submissions.length,
-    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
-    createdAt: assignment.createdAt.toISOString(),
-    updatedAt: assignment.updatedAt.toISOString(),
+    submissionCount: (assignment.submissions as any[])?.length || 0,
+    gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
+    createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
+    updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
   };
 }
 
@@ -598,7 +599,7 @@ export async function getAssignmentSubmissions(assignmentId: string, lecturerId:
     })
   );
 
-  return submissions.map((submission) => ({
+  return (submissions as any[]).map((submission: any) => ({
     id: submission.id,
     assignmentId: submission.assignmentId,
     assignmentTitle: assignment.title,
@@ -912,7 +913,7 @@ export async function getStudentAssignments(
     return [];
   }
 
-  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+  const courseIds = (enrolledCourses as any[]).map((ec: any) => ec.courseId);
 
   // Build where clause
   // Include PUBLISHED assignments and CLOSED assignments that have submissions (so students can see their submitted work)
@@ -980,7 +981,7 @@ export async function getStudentAssignments(
 
   console.log(`[getStudentAssignments] Found ${assignments.length} assignments for student ${studentId}`);
 
-  return assignments.map((assignment) => {
+  return (assignments as any[]).map((assignment: any) => {
     // Get the most recent submission (should only be one due to unique constraint, but take first just in case)
     const studentSubmission = assignment.submissions.length > 0 ? assignment.submissions[0] : undefined;
     
@@ -1064,7 +1065,7 @@ export async function getStudentMissedAssignments(
     return [];
   }
 
-  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+  const courseIds = (enrolledCourses as any[]).map((ec: any) => ec.courseId);
 
   // Build where clause - only CLOSED assignments
   const whereClause: any = {
@@ -1164,7 +1165,7 @@ export async function getStudentGradedAssignments(
     return [];
   }
 
-  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+  const courseIds = (enrolledCourses as any[]).map((ec: any) => ec.courseId);
 
   // Build where clause - get all assignments first, then filter by submissions
   const whereClause: any = {
@@ -1305,12 +1306,13 @@ export async function submitAssignment(
     throw new Error('Assignment not found');
   }
 
-  if (assignment.status !== 'PUBLISHED') {
+  const a = assignment as any;
+  if (a.status !== 'PUBLISHED') {
     throw new Error('Assignment is not available for submission');
   }
 
   // Check if due date has passed
-  if (new Date(assignment.dueDate) < new Date()) {
+  if (new Date(a.dueDate) < new Date()) {
     throw new Error('Assignment due date has passed');
   }
 
@@ -1326,8 +1328,9 @@ export async function submitAssignment(
     throw new Error(`Student with ID ${studentId} not found. Please ensure you are logged in correctly.`);
   }
 
-  if (student.visitorType !== 'STUDENT') {
-    throw new Error(`User ${studentId} is not a student (type: ${student.visitorType}). Only students can submit assignments.`);
+  const s = student as any;
+  if (s.visitorType !== 'STUDENT') {
+    throw new Error(`User ${studentId} is not a student (type: ${s.visitorType}). Only students can submit assignments.`);
   }
 
   // Verify student is enrolled in the course
@@ -1335,7 +1338,7 @@ export async function submitAssignment(
     prisma.studentCourse.findFirst({
       where: {
         studentId,
-        courseId: assignment.courseId,
+        courseId: a.courseId,
       },
     })
   );
@@ -1394,15 +1397,16 @@ export async function submitAssignment(
 
   console.log(`[submitAssignment] Successfully created submission ${submission.id} for student ${studentId}`);
 
+  const sub = submission as any;
   return {
-    id: submission.id,
-    assignmentId: submission.assignmentId,
-    assignmentTitle: submission.assignment.title,
-    studentId: submission.studentId,
-    content: submission.content || undefined,
-    attachments: submission.attachments,
-    submittedAt: submission.submittedAt.toISOString(),
-    status: submission.status,
+    id: sub.id,
+    assignmentId: sub.assignmentId,
+    assignmentTitle: sub.assignment?.title,
+    studentId: sub.studentId,
+    content: sub.content || undefined,
+    attachments: sub.attachments,
+    submittedAt: sub.submittedAt?.toISOString?.() || sub.submittedAt,
+    status: sub.status,
   };
 }
 

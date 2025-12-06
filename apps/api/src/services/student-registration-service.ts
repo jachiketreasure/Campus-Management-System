@@ -23,13 +23,14 @@ export async function getStudentRegistration(studentId: string) {
 
   // Get session name if currentSessionId exists
   let sessionName = '';
-  if (visitor.currentSessionId) {
+  const v = visitor as any;
+  if (v.currentSessionId) {
     const session = await retryDbOperation(() =>
       prisma.academicSession.findUnique({
-        where: { id: visitor.currentSessionId },
+        where: { id: v.currentSessionId },
         select: { name: true },
       })
-    );
+    ) as any;
     sessionName = session?.name || '';
   }
 
@@ -39,14 +40,14 @@ export async function getStudentRegistration(studentId: string) {
       where: { studentId },
       take: 1,
     })
-  );
+  ) as any[];
   const isRegistered = studentCourses.length > 0;
 
   return {
-    sessionId: visitor.currentSessionId || '',
+    sessionId: v.currentSessionId || '',
     sessionName: sessionName,
-    registrationNumber: visitor.registrationNumber,
-    academicLevel: visitor.academicLevel,
+    registrationNumber: v.registrationNumber,
+    academicLevel: v.academicLevel,
     courseOfStudy: visitor.courseOfStudy,
     isRegistered: isRegistered,
   };
@@ -167,7 +168,7 @@ export async function saveStudentRegistration(
   // Create new student course enrollments
   await retryDbOperation(() =>
     prisma.studentCourse.createMany({
-      data: courses.map((course) => ({
+      data: (courses as any[]).map((course: any) => ({
         studentId,
         courseId: course.id,
         courseCode: course.code,
@@ -202,9 +203,9 @@ export async function saveStudentRegistration(
   return {
     sessionId: data.sessionId,
     sessionName: session?.name || '',
-    registrationNumber: visitor.registrationNumber,
-    academicLevel: updatedVisitor?.academicLevel || data.academicLevel,
-    courseOfStudy: updatedVisitor?.courseOfStudy,
+    registrationNumber: (visitor as any).registrationNumber,
+    academicLevel: (updatedVisitor as any)?.academicLevel || data.academicLevel,
+    courseOfStudy: (updatedVisitor as any)?.courseOfStudy,
     isRegistered: hasCourses,
   };
 }
@@ -243,13 +244,14 @@ export async function getStudentCourses(studentId: string) {
 
       // Get lecturer assignment if session and semester are available
       let lecturer = null;
-      if (sessionId && course?.semester) {
+      const c = course as any;
+      if (sessionId && c?.semester) {
         const assignment = await retryDbOperation(() =>
           prisma.lecturerCourseAssignment.findFirst({
             where: {
-              courseId: sc.courseId,
+              courseId: (sc as any).courseId,
               sessionId: sessionId,
-              semester: course.semester,
+              semester: c.semester,
               status: 'ACTIVE',
             },
             include: {
@@ -262,13 +264,13 @@ export async function getStudentCourses(studentId: string) {
               },
             },
           })
-        );
+        ) as any;
 
         if (assignment) {
           lecturer = {
-            id: assignment.lecturer.id,
-            name: assignment.lecturer.name,
-            email: assignment.lecturer.email,
+            id: assignment.lecturer?.id,
+            name: assignment.lecturer?.name,
+            email: assignment.lecturer?.email,
           };
         }
       }
@@ -372,7 +374,7 @@ export async function getRequiredCoursesForStudent(registrationNumber: string, l
       throw new Error(`Student with registration number ${registrationNumber} not found`);
     }
 
-    studentLevel = student.academicLevel || '100';
+    studentLevel = (student as any).academicLevel || '100';
   }
 
   // Get required courses for both semesters of the student's level
@@ -384,8 +386,8 @@ export async function getRequiredCoursesForStudent(registrationNumber: string, l
     firstSemester,
     secondSemester,
     totalUnits: {
-      first: firstSemester.reduce((sum, course) => sum + (course.units || 0), 0),
-      second: secondSemester.reduce((sum, course) => sum + (course.units || 0), 0),
+      first: (firstSemester as any[]).reduce((sum: number, course: any) => sum + (course.units || 0), 0),
+      second: (secondSemester as any[]).reduce((sum: number, course: any) => sum + (course.units || 0), 0),
     },
   };
 }
@@ -403,12 +405,12 @@ export async function checkInitialRegistrationComplete(studentId: string): Promi
       })
     );
 
-    if (user?.profile?.isRegistrationComplete) {
+    if ((user as any)?.profile?.isRegistrationComplete) {
       return true;
     }
 
     // If user exists but no profile, create one (they haven't registered yet)
-    if (user && !user.profile) {
+    if (user && !(user as any).profile) {
       return false;
     }
 
@@ -573,7 +575,7 @@ export async function saveInitialStudentRegistration(
   );
 
   // Update user email if provided and different
-  if (data.email && data.email !== user.email) {
+  if (data.email && data.email !== (user as any).email) {
     await retryDbOperation(() =>
       prisma.user.update({
         where: { id: studentId },
@@ -584,7 +586,7 @@ export async function saveInitialStudentRegistration(
 
   return {
     success: true,
-    isRegistrationComplete: profile.isRegistrationComplete,
+    isRegistrationComplete: (profile as any).isRegistrationComplete,
   };
 }
 

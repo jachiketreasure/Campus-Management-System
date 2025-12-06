@@ -53,7 +53,7 @@ type TransactionRecord = {
   id: string;
   walletId: string;
   orderId: string | null;
-  amount: Prisma.Decimal | number;
+  amount: number;
   type: 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE';
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   reference: string;

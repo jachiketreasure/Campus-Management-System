@@ -78,14 +78,14 @@ export async function getAllActiveLecturers(): Promise<LecturerOption[]> {
   // Combine and format lecturers
   const combinedLecturers: LecturerOption[] = [
     // Format User model lecturers
-    ...userLecturers.map((user) => ({
+    ...(userLecturers as any[]).map((user: any) => ({
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       visitorType: 'LECTURER',
     })),
     // Format Visitor model lecturers
-    ...visitorLecturers.map((visitor) => ({
+    ...(visitorLecturers as any[]).map((visitor: any) => ({
       id: visitor.id,
       name: visitor.name,
       email: visitor.email,
@@ -155,8 +155,8 @@ export async function getCoursesWithAssignments(sessionId: string, semester?: st
 
   // Collect all lecturer IDs to fetch in batch
   const lecturerIds = new Set<string>();
-  courses.forEach((course) => {
-    course.lecturerAssignments.forEach((assignment) => {
+  (courses as any[]).forEach((course: any) => {
+    (course.lecturerAssignments as any[]).forEach((assignment: any) => {
       lecturerIds.add(assignment.lecturerId);
     });
   });
@@ -191,14 +191,14 @@ export async function getCoursesWithAssignments(sessionId: string, semester?: st
 
   // Create a map of lecturer ID to lecturer data
   const lecturerMap = new Map<string, { id: string; name: string; email: string }>();
-  visitorLecturers.forEach((lecturer) => {
+  (visitorLecturers as any[]).forEach((lecturer: any) => {
     lecturerMap.set(lecturer.id, {
       id: lecturer.id,
       name: lecturer.name,
       email: lecturer.email,
     });
   });
-  userLecturers.forEach((lecturer) => {
+  (userLecturers as any[]).forEach((lecturer: any) => {
     lecturerMap.set(lecturer.id, {
       id: lecturer.id,
       name: `${lecturer.firstName} ${lecturer.lastName}`.trim(),
@@ -207,11 +207,11 @@ export async function getCoursesWithAssignments(sessionId: string, semester?: st
   });
 
   // Map courses with lecturer data
-  const coursesWithLecturers = courses.map((course) => ({
+  const coursesWithLecturers = (courses as any[]).map((course: any) => ({
     ...course,
-    lecturerAssignments: course.lecturerAssignments
-      .filter((assignment) => lecturerMap.has(assignment.lecturerId)) // Only include assignments with valid lecturers
-      .map((assignment) => ({
+    lecturerAssignments: (course.lecturerAssignments as any[])
+      .filter((assignment: any) => lecturerMap.has(assignment.lecturerId)) // Only include assignments with valid lecturers
+      .map((assignment: any) => ({
         ...assignment,
         lecturer: lecturerMap.get(assignment.lecturerId)!,
       })),
@@ -267,7 +267,7 @@ export async function assignLecturerToCourse(
   }
 
   // Update course sessionId if it's not set or different
-  if (course.sessionId !== sessionId) {
+  if ((course as any).sessionId !== sessionId) {
     await retryDbOperation(() =>
       prisma.course.update({
         where: { id: courseId },
@@ -277,7 +277,7 @@ export async function assignLecturerToCourse(
   }
 
   // Update course semester if it's not set or different
-  if (!course.semester || course.semester !== semester) {
+  if (!(course as any).semester || (course as any).semester !== semester) {
     await retryDbOperation(() =>
       prisma.course.update({
         where: { id: courseId },
@@ -351,7 +351,7 @@ export async function assignLecturerToCourse(
     // Reactivate the existing assignment
     await retryDbOperation(() =>
       prisma.lecturerCourseAssignment.update({
-        where: { id: existingAssignment.id },
+        where: { id: (existingAssignment as any).id },
         data: {
           status: 'ACTIVE',
         },
@@ -430,7 +430,7 @@ export async function getCourseAssignments(courseId: string, sessionId: string, 
     })
   );
 
-  return assignments.map((assignment) => ({
+  return (assignments as any[]).map((assignment: any) => ({
     id: assignment.id,
     lecturerId: assignment.lecturerId,
     lecturerName: assignment.lecturer.name,

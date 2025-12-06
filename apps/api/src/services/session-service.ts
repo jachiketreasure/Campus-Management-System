@@ -81,7 +81,7 @@ export async function getAvailableSessions(): Promise<AcademicSessionDTO[]> {
     })
   );
 
-  return sessions.map((session) => ({
+  return (sessions as any[]).map((session: any) => ({
     id: session.id,
     name: session.name,
     startDate: session.startDate.toISOString(),
@@ -146,31 +146,32 @@ export async function getStudentSessionRegistration(
     return null;
   }
 
+  const reg = registration as any;
   return {
-    id: registration.id,
-    studentId: registration.studentId,
-    sessionId: registration.sessionId,
-    status: registration.status,
-    approvalType: registration.approvalType,
-    paymentReference: registration.paymentReference || undefined,
-    paymentVerified: registration.paymentVerified,
-    approvedBy: registration.approvedBy || undefined,
-    approvedAt: registration.approvedAt?.toISOString(),
-    notes: registration.notes || undefined,
-    session: registration.session
+    id: reg.id,
+    studentId: reg.studentId,
+    sessionId: reg.sessionId,
+    status: reg.status,
+    approvalType: reg.approvalType,
+    paymentReference: reg.paymentReference || undefined,
+    paymentVerified: reg.paymentVerified,
+    approvedBy: reg.approvedBy || undefined,
+    approvedAt: reg.approvedAt?.toISOString?.(),
+    notes: reg.notes || undefined,
+    session: reg.session
       ? {
-          id: registration.session.id,
-          name: registration.session.name,
-          startDate: registration.session.startDate.toISOString(),
-          endDate: registration.session.endDate.toISOString(),
-          status: registration.session.status,
-          requiresPayment: registration.session.requiresPayment,
-          paymentAmount: registration.session.paymentAmount
-            ? Number(registration.session.paymentAmount)
+          id: reg.session.id,
+          name: reg.session.name,
+          startDate: reg.session.startDate?.toISOString?.(),
+          endDate: reg.session.endDate?.toISOString?.(),
+          status: reg.session.status,
+          requiresPayment: reg.session.requiresPayment,
+          paymentAmount: reg.session.paymentAmount
+            ? Number(reg.session.paymentAmount)
             : undefined,
-          paymentCurrency: registration.session.paymentCurrency || undefined,
-          isActive: registration.session.isActive,
-          registrationOpen: registration.session.registrationOpen,
+          paymentCurrency: reg.session.paymentCurrency || undefined,
+          isActive: reg.session.isActive,
+          registrationOpen: reg.session.registrationOpen,
         }
       : undefined,
   };
@@ -202,31 +203,32 @@ export async function getStudentSessionRegistrationBySession(
     return null;
   }
 
+  const reg = registration as any;
   return {
-    id: registration.id,
-    studentId: registration.studentId,
-    sessionId: registration.sessionId,
-    status: registration.status,
-    approvalType: registration.approvalType,
-    paymentReference: registration.paymentReference || undefined,
-    paymentVerified: registration.paymentVerified,
-    approvedBy: registration.approvedBy || undefined,
-    approvedAt: registration.approvedAt?.toISOString(),
-    notes: registration.notes || undefined,
-    session: registration.session
+    id: reg.id,
+    studentId: reg.studentId,
+    sessionId: reg.sessionId,
+    status: reg.status,
+    approvalType: reg.approvalType,
+    paymentReference: reg.paymentReference || undefined,
+    paymentVerified: reg.paymentVerified,
+    approvedBy: reg.approvedBy || undefined,
+    approvedAt: reg.approvedAt?.toISOString?.(),
+    notes: reg.notes || undefined,
+    session: reg.session
       ? {
-          id: registration.session.id,
-          name: registration.session.name,
-          startDate: registration.session.startDate.toISOString(),
-          endDate: registration.session.endDate.toISOString(),
-          status: registration.session.status,
-          requiresPayment: registration.session.requiresPayment,
-          paymentAmount: registration.session.paymentAmount
-            ? Number(registration.session.paymentAmount)
+          id: reg.session.id,
+          name: reg.session.name,
+          startDate: reg.session.startDate?.toISOString?.(),
+          endDate: reg.session.endDate?.toISOString?.(),
+          status: reg.session.status,
+          requiresPayment: reg.session.requiresPayment,
+          paymentAmount: reg.session.paymentAmount
+            ? Number(reg.session.paymentAmount)
             : undefined,
-          paymentCurrency: registration.session.paymentCurrency || undefined,
-          isActive: registration.session.isActive,
-          registrationOpen: registration.session.registrationOpen,
+          paymentCurrency: reg.session.paymentCurrency || undefined,
+          isActive: reg.session.isActive,
+          registrationOpen: reg.session.registrationOpen,
         }
       : undefined,
   };
@@ -347,14 +349,15 @@ export async function registerForSession(
     throw new Error('Session not found');
   }
 
+  const sess = session as any;
   // Allow registration even if registrationOpen is false, but log a warning
   // This provides more flexibility - admins can manually open registration later
-  if (!session.registrationOpen) {
+  if (!sess.registrationOpen) {
     console.warn(`Session ${sessionId} registration is not open, but allowing registration anyway`);
   }
 
-  if (session.status !== 'ACTIVE' && session.status !== 'PENDING') {
-    throw new Error(`Session is not available for registration. Current status: ${session.status}`);
+  if (sess.status !== 'ACTIVE' && sess.status !== 'PENDING') {
+    throw new Error(`Session is not available for registration. Current status: ${sess.status}`);
   }
 
   // Check if student already has a registration for this session
@@ -503,7 +506,7 @@ export async function registerForSession(
   }
 
   return {
-    id: registration.id,
+    id: (registration as any).id,
     studentId: registration.studentId,
     sessionId: registration.sessionId,
     status: registration.status,
@@ -557,7 +560,7 @@ export async function getAllSessions(): Promise<AcademicSessionDTO[]> {
     })
   );
 
-  return sessions.map((session) => ({
+  return (sessions as any[]).map((session: any) => ({
     id: session.id,
     name: session.name,
     startDate: session.startDate.toISOString(),
@@ -660,7 +663,7 @@ export async function updateSession(
   console.log('Updating session:', { 
     sessionId, 
     updateData, 
-    originalStatus: existingSession.status,
+    originalStatus: (existingSession as any).status,
     hasStatusUpdate: updateData.status !== undefined
   });
 
@@ -748,7 +751,7 @@ export async function getAllSessionRegistrations(
     })
   );
 
-  return registrations.map((reg) => ({
+  return (registrations as any[]).map((reg: any) => ({
     id: reg.id,
     studentId: reg.studentId,
     sessionId: reg.sessionId,
@@ -821,7 +824,7 @@ export async function approveSessionRegistration(
   );
 
   return {
-    id: registration.id,
+    id: (registration as any).id,
     studentId: registration.studentId,
     sessionId: registration.sessionId,
     status: registration.status,
@@ -883,7 +886,7 @@ export async function rejectSessionRegistration(
   );
 
   return {
-    id: registration.id,
+    id: (registration as any).id,
     studentId: registration.studentId,
     sessionId: registration.sessionId,
     status: registration.status,
@@ -956,7 +959,7 @@ export async function verifyPayment(
   );
 
   return {
-    id: registration.id,
+    id: (registration as any).id,
     studentId: registration.studentId,
     sessionId: registration.sessionId,
     status: registration.status,

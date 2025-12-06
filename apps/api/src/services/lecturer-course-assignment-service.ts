@@ -72,8 +72,8 @@ export async function getAvailableCoursesForAssignment(sessionId: string, semest
     ],
   });
 
-  return courses.map((course) => {
-    const activeAssignment = course.lecturerAssignments.find(a => a.status === 'ACTIVE');
+  return (courses as any[]).map((course: any) => {
+    const activeAssignment = (course.lecturerAssignments as any[]).find((a: any) => a.status === 'ACTIVE');
     return {
       id: course.id,
       code: course.code,
@@ -149,11 +149,11 @@ export async function getLecturerAssignedCourses(lecturerId: string, sessionId: 
   ]);
 
   // Determine lecturer name and email
-  const lecturerName = visitorLecturer?.name || 
-    (userLecturer ? `${userLecturer.firstName} ${userLecturer.lastName}`.trim() : 'Unknown Lecturer');
-  const lecturerEmail = visitorLecturer?.email || userLecturer?.email || '';
+  const lecturerName = (visitorLecturer as any)?.name || 
+    ((userLecturer as any) ? `${(userLecturer as any).firstName} ${(userLecturer as any).lastName}`.trim() : 'Unknown Lecturer');
+  const lecturerEmail = (visitorLecturer as any)?.email || (userLecturer as any)?.email || '';
 
-  return assignments.map((assignment) => ({
+  return (assignments as any[]).map((assignment: any) => ({
     id: assignment.id,
     lecturerId: assignment.lecturerId,
     lecturerName,

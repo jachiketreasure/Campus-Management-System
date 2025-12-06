@@ -57,7 +57,7 @@ export async function getNextChronologicalSession(
     })
   );
 
-  return nextSession;
+  return nextSession as { id: string; name: string; startDate: Date } | null;
 }
 
 /**
@@ -137,22 +137,23 @@ export async function progressStudentToNextLevel(
     return { success: false, message: 'Student not found' };
   }
 
-  if (student.visitorType !== 'STUDENT') {
+  const s = student as any;
+  if (s.visitorType !== 'STUDENT') {
     return { success: false, message: 'User is not a student' };
   }
 
-  if (!student.academicLevel || !student.currentSessionId) {
+  if (!s.academicLevel || !s.currentSessionId) {
     return { success: false, message: 'Student does not have a current level or session assigned' };
   }
 
   // Get next level
-  const nextLevel = getNextLevel(student.academicLevel);
+  const nextLevel = getNextLevel(s.academicLevel);
   if (!nextLevel) {
-    return { success: false, message: `Cannot progress from level ${student.academicLevel}. Maximum level reached or invalid level format.` };
+    return { success: false, message: `Cannot progress from level ${s.academicLevel}. Maximum level reached or invalid level format.` };
   }
 
   // Get next chronological session
-  const nextSession = await getNextChronologicalSession(student.currentSessionId);
+  const nextSession = await getNextChronologicalSession(s.currentSessionId);
   if (!nextSession) {
     return { success: false, message: 'No next academic session found. Please create a new session first.' };
   }
@@ -162,14 +163,14 @@ export async function progressStudentToNextLevel(
     studentId,
     nextLevel,
     nextSession.id,
-    student.cohortSessionId || student.currentSessionId // Preserve cohort session
+    s.cohortSessionId || s.currentSessionId // Preserve cohort session
   );
 
   return {
     success: true,
     newLevel: nextLevel,
     newSessionId: nextSession.id,
-    message: `Student progressed from ${student.academicLevel} to ${nextLevel} for session ${nextSession.name}`,
+    message: `Student progressed from ${s.academicLevel} to ${nextLevel} for session ${nextSession.name}`,
   };
 }
 
@@ -211,32 +212,33 @@ export async function progressAllEligibleStudents(
   const errors: string[] = [];
   let progressed = 0;
 
-  for (const student of students) {
-    if (!student.academicLevel || !student.currentSessionId) {
+  for (const student of students as any[]) {
+    const st = student as any;
+    if (!st.academicLevel || !st.currentSessionId) {
       continue;
     }
 
     // Check if student's current session ends before the new session starts
     const currentSession = await retryDbOperation(() =>
       prisma.academicSession.findUnique({
-        where: { id: student.currentSessionId },
+        where: { id: st.currentSessionId },
         select: { endDate: true },
       })
-    );
+    ) as any;
 
     if (!currentSession) {
-      errors.push(`Student ${student.id}: Current session not found`);
+      errors.push(`Student ${st.id}: Current session not found`);
       continue;
     }
 
     // Only progress if the new session starts after the current session ends
-    if (newSession.startDate > currentSession.endDate) {
+    if ((newSession as any).startDate > currentSession.endDate) {
       try {
-        const result = await progressStudentToNextLevel(student.id);
+        const result = await progressStudentToNextLevel(st.id);
         if (result.success) {
           progressed++;
         } else {
-          errors.push(`Student ${student.id}: ${result.message}`);
+          errors.push(`Student ${st.id}: ${result.message}`);
         }
       } catch (error: any) {
         errors.push(`Student ${student.id}: ${error.message || 'Unknown error'}`);
@@ -287,7 +289,8 @@ export async function getStudentCurrentLevelInfo(studentId: string) {
     })
   );
 
-  if (!student || !student.currentSessionId) {
+  const st = student as any;
+  if (!st || !st.currentSessionId) {
     return null;
   }
 
@@ -304,10 +307,10 @@ export async function getStudentCurrentLevelInfo(studentId: string) {
     })
   );
 
-  const cohortSession = student.cohortSessionId
+  const cohortSession = st.cohortSessionId
     ? await retryDbOperation(() =>
         prisma.academicSession.findUnique({
-          where: { id: student.cohortSessionId },
+          where: { id: st.cohortSessionId },
           select: {
             id: true,
             name: true,
@@ -318,10 +321,10 @@ export async function getStudentCurrentLevelInfo(studentId: string) {
 
   return {
     student: {
-      id: student.id,
-      registrationNumber: student.registrationNumber,
-      academicLevel: student.academicLevel,
-      courseOfStudy: student.courseOfStudy,
+      id: st.id,
+      registrationNumber: st.registrationNumber,
+      academicLevel: st.academicLevel,
+      courseOfStudy: st.courseOfStudy,
     },
     currentSession: session,
     cohortSession: cohortSession,
