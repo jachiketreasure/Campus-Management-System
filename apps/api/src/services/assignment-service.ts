@@ -1,0 +1,1410 @@
+import { prisma } from '@cms/database';
+import { retryDbOperation } from '../utils/db-retry';
+
+/**
+ * Automatically close assignments that have passed their due date
+ * This should be called periodically or when fetching assignments
+ */
+export async function closeOverdueAssignments(): Promise<number> {
+  if (!prisma.assignment) {
+    return 0;
+  }
+
+  const now = new Date();
+  
+  const result = await retryDbOperation(() =>
+    prisma.assignment.updateMany({
+      where: {
+        status: { in: ['DRAFT', 'PUBLISHED'] },
+        dueDate: { lt: now },
+      },
+      data: {
+        status: 'CLOSED',
+      },
+    })
+  );
+
+  return result.count;
+}
+
+export interface CreateAssignmentInput {
+  courseId: string;
+  sessionId: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate: string;
+  maxScore?: number;
+  attachments?: string[];
+}
+
+export interface UpdateAssignmentInput {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string;
+  maxScore?: number;
+  attachments?: string[];
+  status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+}
+
+export interface AssignmentDTO {
+  id: string;
+  courseId: string;
+  courseCode: string;
+  courseTitle: string;
+  lecturerId: string;
+  lecturerName: string;
+  sessionId: string;
+  sessionName: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate: string;
+  maxScore: number;
+  attachments: string[];
+  status: string;
+  submissionCount?: number;
+  gradedCount?: number;
+  createdAt: string;
+  updatedAt: string;
+  studentSubmission?: {
+    id: string;
+    status: string;
+    submittedAt: string;
+    grade?: {
+      score: number;
+      maxScore: number;
+      returnedAt?: string;
+    };
+  };
+}
+
+export interface AssignmentSubmissionDTO {
+  id: string;
+  assignmentId: string;
+  assignmentTitle: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  studentRegistrationNumber?: string;
+  content?: string;
+  attachments: string[];
+  submittedAt: string;
+  status: string;
+  grade?: {
+    id: string;
+    score: number;
+    maxScore: number;
+    feedback?: string;
+    gradedAt: string;
+    returnedAt?: string;
+  };
+}
+
+/**
+ * Get all assignments for a lecturer
+ */
+export async function getLecturerAssignments(lecturerId: string): Promise<AssignmentDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  const assignments = await retryDbOperation(() =>
+    prisma.assignment.findMany({
+      where: {
+        lecturerId,
+      },
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          select: {
+            id: true,
+            status: true,
+            grade: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+  );
+
+  return assignments.map((assignment) => ({
+    id: assignment.id,
+    courseId: assignment.courseId,
+    courseCode: assignment.course.code,
+    courseTitle: assignment.course.title,
+    lecturerId: assignment.lecturerId,
+    lecturerName: assignment.lecturer.name,
+    sessionId: assignment.sessionId,
+    sessionName: assignment.session.name,
+    title: assignment.title,
+    description: assignment.description || undefined,
+    instructions: assignment.instructions || undefined,
+    dueDate: assignment.dueDate.toISOString(),
+    maxScore: Number(assignment.maxScore),
+    attachments: assignment.attachments,
+    status: assignment.status,
+    submissionCount: assignment.submissions.length,
+    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  }));
+}
+
+/**
+ * Get assignments for a specific course
+ */
+export async function getCourseAssignments(courseId: string, sessionId: string): Promise<AssignmentDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  const assignments = await retryDbOperation(() =>
+    prisma.assignment.findMany({
+      where: {
+        courseId,
+        sessionId,
+      },
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          select: {
+            id: true,
+            status: true,
+            grade: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'asc',
+      },
+    })
+  );
+
+  return assignments.map((assignment) => ({
+    id: assignment.id,
+    courseId: assignment.courseId,
+    courseCode: assignment.course.code,
+    courseTitle: assignment.course.title,
+    lecturerId: assignment.lecturerId,
+    lecturerName: assignment.lecturer.name,
+    sessionId: assignment.sessionId,
+    sessionName: assignment.session.name,
+    title: assignment.title,
+    description: assignment.description || undefined,
+    instructions: assignment.instructions || undefined,
+    dueDate: assignment.dueDate.toISOString(),
+    maxScore: Number(assignment.maxScore),
+    attachments: assignment.attachments,
+    status: assignment.status,
+    submissionCount: assignment.submissions.length,
+    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  }));
+}
+
+/**
+ * Get a single assignment by ID
+ */
+export async function getAssignmentById(assignmentId: string): Promise<AssignmentDTO | null> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  const assignment = await retryDbOperation(() =>
+    prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          select: {
+            id: true,
+            status: true,
+            grade: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  );
+
+  if (!assignment) {
+    return null;
+  }
+
+  return {
+    id: assignment.id,
+    courseId: assignment.courseId,
+    courseCode: assignment.course.code,
+    courseTitle: assignment.course.title,
+    lecturerId: assignment.lecturerId,
+    lecturerName: assignment.lecturer.name,
+    sessionId: assignment.sessionId,
+    sessionName: assignment.session.name,
+    title: assignment.title,
+    description: assignment.description || undefined,
+    instructions: assignment.instructions || undefined,
+    dueDate: assignment.dueDate.toISOString(),
+    maxScore: Number(assignment.maxScore),
+    attachments: assignment.attachments,
+    status: assignment.status,
+    submissionCount: assignment.submissions.length,
+    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Create a new assignment
+ */
+export async function createAssignment(lecturerId: string, input: CreateAssignmentInput): Promise<AssignmentDTO> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Get course to find its semester
+  const course = await retryDbOperation(() =>
+    prisma.course.findUnique({
+      where: { id: input.courseId },
+      select: { semester: true },
+    })
+  );
+
+  if (!course) {
+    throw new Error('Course not found');
+  }
+
+  // Verify lecturer is assigned to this course for the session and semester
+  const courseAssignment = await retryDbOperation(() =>
+    prisma.lecturerCourseAssignment.findFirst({
+      where: {
+        lecturerId,
+        courseId: input.courseId,
+        sessionId: input.sessionId,
+        status: 'ACTIVE',
+        // If course has a semester, check that the assignment matches
+        ...(course.semester ? { semester: course.semester } : {}),
+      },
+    })
+  );
+
+  if (!courseAssignment) {
+    throw new Error('You are not assigned to this course for the selected session. Please contact an administrator to be assigned to the course.');
+  }
+
+  const assignment = await retryDbOperation(() =>
+    prisma.assignment.create({
+      data: {
+        courseId: input.courseId,
+        sessionId: input.sessionId,
+        lecturerId,
+        title: input.title,
+        description: input.description || null,
+        instructions: input.instructions || null,
+        dueDate: new Date(input.dueDate),
+        maxScore: input.maxScore || 100,
+        attachments: input.attachments || [],
+        status: 'DRAFT',
+      },
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: true,
+      },
+    })
+  );
+
+  return {
+    id: assignment.id,
+    courseId: assignment.courseId,
+    courseCode: assignment.course.code,
+    courseTitle: assignment.course.title,
+    lecturerId: assignment.lecturerId,
+    lecturerName: assignment.lecturer.name,
+    sessionId: assignment.sessionId,
+    sessionName: assignment.session.name,
+    title: assignment.title,
+    description: assignment.description || undefined,
+    instructions: assignment.instructions || undefined,
+    dueDate: assignment.dueDate.toISOString(),
+    maxScore: Number(assignment.maxScore),
+    attachments: assignment.attachments,
+    status: assignment.status,
+    submissionCount: 0,
+    gradedCount: 0,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Update an assignment
+ */
+export async function updateAssignment(
+  assignmentId: string,
+  lecturerId: string,
+  input: UpdateAssignmentInput
+): Promise<AssignmentDTO> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify lecturer owns this assignment
+  const existing = await retryDbOperation(() =>
+    prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { lecturerId: true },
+    })
+  );
+
+  if (!existing) {
+    throw new Error('Assignment not found');
+  }
+
+  if (existing.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only update your own assignments');
+  }
+
+  const updateData: any = {};
+  if (input.title !== undefined) updateData.title = input.title;
+  if (input.description !== undefined) updateData.description = input.description || null;
+  if (input.instructions !== undefined) updateData.instructions = input.instructions || null;
+  if (input.dueDate !== undefined) updateData.dueDate = new Date(input.dueDate);
+  if (input.maxScore !== undefined) updateData.maxScore = input.maxScore;
+  if (input.attachments !== undefined) updateData.attachments = input.attachments;
+  if (input.status !== undefined) updateData.status = input.status;
+
+  const assignment = await retryDbOperation(() =>
+    prisma.assignment.update({
+      where: { id: assignmentId },
+      data: updateData,
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          select: {
+            id: true,
+            status: true,
+            grade: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  );
+
+  return {
+    id: assignment.id,
+    courseId: assignment.courseId,
+    courseCode: assignment.course.code,
+    courseTitle: assignment.course.title,
+    lecturerId: assignment.lecturerId,
+    lecturerName: assignment.lecturer.name,
+    sessionId: assignment.sessionId,
+    sessionName: assignment.session.name,
+    title: assignment.title,
+    description: assignment.description || undefined,
+    instructions: assignment.instructions || undefined,
+    dueDate: assignment.dueDate.toISOString(),
+    maxScore: Number(assignment.maxScore),
+    attachments: assignment.attachments,
+    status: assignment.status,
+    submissionCount: assignment.submissions.length,
+    gradedCount: assignment.submissions.filter((s) => s.grade !== null).length,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Delete an assignment
+ */
+export async function deleteAssignment(assignmentId: string, lecturerId: string): Promise<void> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment) {
+    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify lecturer owns this assignment
+  const existing = await retryDbOperation(() =>
+    prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { lecturerId: true },
+    })
+  );
+
+  if (!existing) {
+    throw new Error('Assignment not found');
+  }
+
+  if (existing.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only delete your own assignments');
+  }
+
+  await retryDbOperation(() =>
+    prisma.assignment.delete({
+      where: { id: assignmentId },
+    })
+  );
+}
+
+/**
+ * Get submissions for an assignment
+ */
+export async function getAssignmentSubmissions(assignmentId: string, lecturerId: string): Promise<AssignmentSubmissionDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment || !prisma.assignmentSubmission) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify lecturer owns this assignment
+  const assignment = await retryDbOperation(() =>
+    prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { lecturerId: true, title: true },
+    })
+  );
+
+  if (!assignment) {
+    throw new Error('Assignment not found');
+  }
+
+  if (assignment.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only view submissions for your own assignments');
+  }
+
+  const submissions = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findMany({
+      where: { assignmentId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            registrationNumber: true,
+          },
+        },
+        grade: {
+          include: {
+            lecturer: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        submittedAt: 'desc',
+      },
+    })
+  );
+
+  return submissions.map((submission) => ({
+    id: submission.id,
+    assignmentId: submission.assignmentId,
+    assignmentTitle: assignment.title,
+    studentId: submission.studentId,
+    studentName: submission.student.name,
+    studentEmail: submission.student.email,
+    studentRegistrationNumber: submission.student.registrationNumber || undefined,
+    content: submission.content || undefined,
+    attachments: submission.attachments,
+    submittedAt: submission.submittedAt.toISOString(),
+    status: submission.status,
+    grade: submission.grade
+      ? {
+          id: submission.grade.id,
+          score: Number(submission.grade.score),
+          maxScore: Number(submission.grade.maxScore),
+          feedback: submission.grade.feedback || undefined,
+          gradedAt: submission.grade.gradedAt.toISOString(),
+          returnedAt: submission.grade.returnedAt?.toISOString(),
+        }
+      : undefined,
+  }));
+}
+
+/**
+ * Grade an assignment submission
+ */
+export async function gradeSubmission(
+  submissionId: string,
+  lecturerId: string,
+  score: number,
+  maxScore: number,
+  feedback?: string
+): Promise<AssignmentSubmissionDTO> {
+  // Check if Assignment models exist in Prisma client
+  if (!prisma.assignment || !prisma.assignmentSubmission || !prisma.assignmentGrade) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify submission exists and lecturer has access
+  const submission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            lecturerId: true,
+            maxScore: true,
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            registrationNumber: true,
+          },
+        },
+      },
+    })
+  );
+
+  if (!submission) {
+    throw new Error('Submission not found');
+  }
+
+  if (submission.assignment.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only grade submissions for your own assignments');
+  }
+
+  // Use assignment's maxScore if not provided
+  const finalMaxScore = maxScore || Number(submission.assignment.maxScore);
+
+  // Create or update grade
+  const grade = await retryDbOperation(() =>
+    prisma.assignmentGrade.upsert({
+      where: { submissionId },
+      create: {
+        submissionId,
+        lecturerId,
+        score,
+        maxScore: finalMaxScore,
+        feedback: feedback || null,
+      },
+      update: {
+        score,
+        maxScore: finalMaxScore,
+        feedback: feedback || null,
+        gradedAt: new Date(),
+      },
+    })
+  );
+
+  // Update submission status
+  await retryDbOperation(() =>
+    prisma.assignmentSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: 'GRADED',
+      },
+    })
+  );
+
+  // Get updated submission with grade
+  const updatedSubmission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            registrationNumber: true,
+          },
+        },
+        grade: {
+          include: {
+            lecturer: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  );
+
+  if (!updatedSubmission) {
+    throw new Error('Failed to retrieve updated submission');
+  }
+
+  return {
+    id: updatedSubmission.id,
+    assignmentId: updatedSubmission.assignmentId,
+    assignmentTitle: submission.assignment.title,
+    studentId: updatedSubmission.studentId,
+    studentName: updatedSubmission.student.name,
+    studentEmail: updatedSubmission.student.email,
+    studentRegistrationNumber: updatedSubmission.student.registrationNumber || undefined,
+    content: updatedSubmission.content || undefined,
+    attachments: updatedSubmission.attachments,
+    submittedAt: updatedSubmission.submittedAt.toISOString(),
+    status: updatedSubmission.status,
+    grade: {
+      id: updatedSubmission.grade!.id,
+      score: Number(updatedSubmission.grade!.score),
+      maxScore: Number(updatedSubmission.grade!.maxScore),
+      feedback: updatedSubmission.grade!.feedback || undefined,
+      gradedAt: updatedSubmission.grade!.gradedAt.toISOString(),
+      returnedAt: updatedSubmission.grade!.returnedAt?.toISOString(),
+    },
+  };
+}
+
+/**
+ * Return graded assignment to student
+ */
+export async function returnGradedAssignment(submissionId: string, lecturerId: string): Promise<AssignmentSubmissionDTO> {
+  // Check if Assignment models exist in Prisma client
+  if (!prisma.assignment || !prisma.assignmentSubmission || !prisma.assignmentGrade) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify submission exists and has been graded
+  const submission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            lecturerId: true,
+          },
+        },
+        grade: {
+          select: {
+            id: true,
+            lecturerId: true,
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            registrationNumber: true,
+          },
+        },
+      },
+    })
+  );
+
+  if (!submission) {
+    throw new Error('Submission not found');
+  }
+
+  if (submission.assignment.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only return submissions for your own assignments');
+  }
+
+  if (!submission.grade) {
+    throw new Error('Submission must be graded before it can be returned');
+  }
+
+  if (submission.grade.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: You can only return submissions you graded');
+  }
+
+  // Update grade with returnedAt timestamp
+  await retryDbOperation(() =>
+    prisma.assignmentGrade.update({
+      where: { id: submission.grade.id },
+      data: {
+        returnedAt: new Date(),
+      },
+    })
+  );
+
+  // Update submission status
+  await retryDbOperation(() =>
+    prisma.assignmentSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: 'RETURNED',
+      },
+    })
+  );
+
+  // Get updated submission
+  const updatedSubmission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            registrationNumber: true,
+          },
+        },
+        grade: {
+          include: {
+            lecturer: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  );
+
+  if (!updatedSubmission) {
+    throw new Error('Failed to retrieve updated submission');
+  }
+
+  return {
+    id: updatedSubmission.id,
+    assignmentId: updatedSubmission.assignmentId,
+    assignmentTitle: submission.assignment.title,
+    studentId: updatedSubmission.studentId,
+    studentName: updatedSubmission.student.name,
+    studentEmail: updatedSubmission.student.email,
+    studentRegistrationNumber: updatedSubmission.student.registrationNumber || undefined,
+    content: updatedSubmission.content || undefined,
+    attachments: updatedSubmission.attachments,
+    submittedAt: updatedSubmission.submittedAt.toISOString(),
+    status: updatedSubmission.status,
+    grade: {
+      id: updatedSubmission.grade!.id,
+      score: Number(updatedSubmission.grade!.score),
+      maxScore: Number(updatedSubmission.grade!.maxScore),
+      feedback: updatedSubmission.grade!.feedback || undefined,
+      gradedAt: updatedSubmission.grade!.gradedAt.toISOString(),
+      returnedAt: updatedSubmission.grade!.returnedAt?.toISOString(),
+    },
+  };
+}
+
+/**
+ * Get assignments for a student based on their enrolled courses
+ */
+export async function getStudentAssignments(
+  studentId: string,
+  sessionId?: string
+): Promise<AssignmentDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment || !prisma.studentCourse) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Automatically close overdue assignments
+  await closeOverdueAssignments();
+
+  // Get student's enrolled courses
+  const enrolledCourses = await retryDbOperation(() =>
+    prisma.studentCourse.findMany({
+      where: { studentId },
+      select: { courseId: true },
+    })
+  );
+
+  if (enrolledCourses.length === 0) {
+    return [];
+  }
+
+  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+
+  // Build where clause
+  // Include PUBLISHED assignments and CLOSED assignments that have submissions (so students can see their submitted work)
+  const whereClause: any = {
+    courseId: { in: courseIds },
+    status: { in: ['PUBLISHED', 'CLOSED'] },
+  };
+
+  // If sessionId is provided, filter by session
+  if (sessionId) {
+    whereClause.sessionId = sessionId;
+  }
+
+  const assignments = await retryDbOperation(() =>
+    prisma.assignment.findMany({
+      where: whereClause,
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          where: { 
+            studentId,
+            // Include all submission statuses - we'll filter on frontend
+          },
+          select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            grade: {
+              select: {
+                id: true,
+                score: true,
+                maxScore: true,
+                feedback: true,
+                gradedAt: true,
+                returnedAt: true,
+              },
+            },
+          },
+          take: 1, // Only get the most recent submission
+          orderBy: {
+            submittedAt: 'desc',
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'asc',
+      },
+    })
+  );
+
+  console.log(`[getStudentAssignments] Found ${assignments.length} assignments for student ${studentId}`);
+
+  return assignments.map((assignment) => {
+    // Get the most recent submission (should only be one due to unique constraint, but take first just in case)
+    const studentSubmission = assignment.submissions.length > 0 ? assignment.submissions[0] : undefined;
+    
+    // Log for debugging
+    if (studentSubmission) {
+      console.log(`[getStudentAssignments] Found submission for assignment "${assignment.title}" (${assignment.id}):`, {
+        submissionId: studentSubmission.id,
+        status: studentSubmission.status,
+        hasGrade: !!studentSubmission.grade,
+        submittedAt: studentSubmission.submittedAt,
+      });
+    } else {
+      console.log(`[getStudentAssignments] No submission found for assignment "${assignment.title}" (${assignment.id})`);
+    }
+    
+    return {
+      id: assignment.id,
+      courseId: assignment.courseId,
+      courseCode: assignment.course.code,
+      courseTitle: assignment.course.title,
+      lecturerId: assignment.lecturerId,
+      lecturerName: assignment.lecturer.name,
+      sessionId: assignment.sessionId,
+      sessionName: assignment.session.name,
+      title: assignment.title,
+      description: assignment.description || undefined,
+      instructions: assignment.instructions || undefined,
+      dueDate: assignment.dueDate.toISOString(),
+      maxScore: Number(assignment.maxScore),
+      attachments: assignment.attachments,
+      status: assignment.status,
+      submissionCount: assignment.submissions.length,
+      gradedCount: 0,
+      createdAt: assignment.createdAt.toISOString(),
+      updatedAt: assignment.updatedAt.toISOString(),
+      // Add student-specific submission info
+      studentSubmission: studentSubmission
+        ? {
+            id: studentSubmission.id,
+            status: studentSubmission.status,
+            submittedAt: studentSubmission.submittedAt.toISOString(),
+            grade: studentSubmission.grade
+              ? {
+                  score: Number(studentSubmission.grade.score),
+                  maxScore: Number(studentSubmission.grade.maxScore),
+                  feedback: studentSubmission.grade.feedback || undefined,
+                  gradedAt: studentSubmission.grade.gradedAt?.toISOString(),
+                  returnedAt: studentSubmission.grade.returnedAt?.toISOString(),
+                }
+              : undefined,
+          }
+        : undefined,
+    };
+  });
+}
+
+/**
+ * Get missed assignments for a student (CLOSED assignments without submission)
+ */
+export async function getStudentMissedAssignments(
+  studentId: string,
+  sessionId?: string
+): Promise<AssignmentDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment || !prisma.studentCourse) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Automatically close overdue assignments first
+  await closeOverdueAssignments();
+
+  // Get student's enrolled courses
+  const enrolledCourses = await retryDbOperation(() =>
+    prisma.studentCourse.findMany({
+      where: { studentId },
+      select: { courseId: true },
+    })
+  );
+
+  if (enrolledCourses.length === 0) {
+    return [];
+  }
+
+  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+
+  // Build where clause - only CLOSED assignments
+  const whereClause: any = {
+    courseId: { in: courseIds },
+    status: 'CLOSED',
+  };
+
+  // If sessionId is provided, filter by session
+  if (sessionId) {
+    whereClause.sessionId = sessionId;
+  }
+
+  const assignments = await retryDbOperation(() =>
+    prisma.assignment.findMany({
+      where: whereClause,
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          where: { studentId },
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'desc',
+      },
+    })
+  );
+
+  // Filter to only include assignments where the student has NO submission
+  const missedAssignments = assignments.filter(assignment => assignment.submissions.length === 0);
+
+  return missedAssignments.map((assignment) => {
+    return {
+      id: assignment.id,
+      courseId: assignment.courseId,
+      courseCode: assignment.course.code,
+      courseTitle: assignment.course.title,
+      lecturerId: assignment.lecturerId,
+      lecturerName: assignment.lecturer.name,
+      sessionId: assignment.sessionId,
+      sessionName: assignment.session.name,
+      title: assignment.title,
+      description: assignment.description || undefined,
+      instructions: assignment.instructions || undefined,
+      dueDate: assignment.dueDate.toISOString(),
+      maxScore: Number(assignment.maxScore),
+      attachments: assignment.attachments,
+      status: assignment.status,
+      submissionCount: 0,
+      gradedCount: 0,
+      createdAt: assignment.createdAt.toISOString(),
+      updatedAt: assignment.updatedAt.toISOString(),
+      // No studentSubmission for missed assignments
+      studentSubmission: undefined,
+    };
+  });
+}
+
+/**
+ * Get graded assignments for a student (assignments that have been graded and returned)
+ */
+export async function getStudentGradedAssignments(
+  studentId: string,
+  sessionId?: string
+): Promise<AssignmentDTO[]> {
+  // Check if Assignment model exists in Prisma client
+  if (!prisma.assignment || !prisma.assignmentSubmission || !prisma.studentCourse) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Get student's enrolled courses
+  const enrolledCourses = await retryDbOperation(() =>
+    prisma.studentCourse.findMany({
+      where: { studentId },
+      select: { courseId: true },
+    })
+  );
+
+  if (enrolledCourses.length === 0) {
+    return [];
+  }
+
+  const courseIds = enrolledCourses.map((ec) => ec.courseId);
+
+  // Build where clause - get all assignments first, then filter by submissions
+  const whereClause: any = {
+    courseId: { in: courseIds },
+    status: 'PUBLISHED',
+  };
+
+  // If sessionId is provided, filter by session
+  if (sessionId) {
+    whereClause.sessionId = sessionId;
+  }
+
+  const assignments = await retryDbOperation(() =>
+    prisma.assignment.findMany({
+      where: whereClause,
+      include: {
+        course: {
+          select: {
+            code: true,
+            title: true,
+          },
+        },
+        session: {
+          select: {
+            name: true,
+          },
+        },
+        lecturer: {
+          select: {
+            name: true,
+          },
+        },
+        submissions: {
+          where: {
+            studentId,
+            status: 'RETURNED', // Only get returned submissions
+          },
+          include: {
+            grade: {
+              select: {
+                id: true,
+                score: true,
+                maxScore: true,
+                feedback: true,
+                gradedAt: true,
+                returnedAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'desc',
+      },
+    })
+  );
+
+  // Filter to only include assignments with graded and returned submissions
+  const gradedAssignments = assignments.filter(assignment => {
+    return assignment.submissions.some(sub => 
+      sub.status === 'RETURNED' && sub.grade !== null
+    );
+  });
+
+  return gradedAssignments.map((assignment) => {
+    const studentSubmission = assignment.submissions.find(sub => 
+      sub.status === 'RETURNED' && sub.grade !== null
+    );
+    return {
+      id: assignment.id,
+      courseId: assignment.courseId,
+      courseCode: assignment.course.code,
+      courseTitle: assignment.course.title,
+      lecturerId: assignment.lecturerId,
+      lecturerName: assignment.lecturer.name,
+      sessionId: assignment.sessionId,
+      sessionName: assignment.session.name,
+      title: assignment.title,
+      description: assignment.description || undefined,
+      instructions: assignment.instructions || undefined,
+      dueDate: assignment.dueDate.toISOString(),
+      maxScore: Number(assignment.maxScore),
+      attachments: assignment.attachments,
+      status: assignment.status,
+      submissionCount: assignment.submissions.length,
+      gradedCount: 0,
+      createdAt: assignment.createdAt.toISOString(),
+      updatedAt: assignment.updatedAt.toISOString(),
+      // Add student-specific submission info with grade
+      studentSubmission: studentSubmission
+        ? {
+            id: studentSubmission.id,
+            status: studentSubmission.status,
+            submittedAt: studentSubmission.submittedAt.toISOString(),
+            grade: studentSubmission.grade
+              ? {
+                  score: Number(studentSubmission.grade.score),
+                  maxScore: Number(studentSubmission.grade.maxScore),
+                  feedback: studentSubmission.grade.feedback || undefined,
+                  gradedAt: studentSubmission.grade.gradedAt.toISOString(),
+                  returnedAt: studentSubmission.grade.returnedAt?.toISOString(),
+                }
+              : undefined,
+          }
+        : undefined,
+    } as any;
+  });
+}
+
+/**
+ * Submit an assignment as a student
+ */
+export async function submitAssignment(
+  assignmentId: string,
+  studentId: string,
+  content?: string,
+  attachments: string[] = []
+): Promise<any> {
+  // Check if Assignment models exist in Prisma client
+  if (!prisma.assignment || !prisma.assignmentSubmission) {
+    throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
+  }
+
+  // Verify assignment exists and is published
+  const assignment = await retryDbOperation(() =>
+    prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        id: true,
+        status: true,
+        dueDate: true,
+        courseId: true,
+      },
+    })
+  );
+
+  if (!assignment) {
+    throw new Error('Assignment not found');
+  }
+
+  if (assignment.status !== 'PUBLISHED') {
+    throw new Error('Assignment is not available for submission');
+  }
+
+  // Check if due date has passed
+  if (new Date(assignment.dueDate) < new Date()) {
+    throw new Error('Assignment due date has passed');
+  }
+
+  // Verify student (Visitor) exists and is a STUDENT
+  const student = await retryDbOperation(() =>
+    prisma.visitor.findUnique({
+      where: { id: studentId },
+      select: { id: true, visitorType: true, name: true, email: true },
+    })
+  );
+
+  if (!student) {
+    throw new Error(`Student with ID ${studentId} not found. Please ensure you are logged in correctly.`);
+  }
+
+  if (student.visitorType !== 'STUDENT') {
+    throw new Error(`User ${studentId} is not a student (type: ${student.visitorType}). Only students can submit assignments.`);
+  }
+
+  // Verify student is enrolled in the course
+  const enrollment = await retryDbOperation(() =>
+    prisma.studentCourse.findFirst({
+      where: {
+        studentId,
+        courseId: assignment.courseId,
+      },
+    })
+  );
+
+  if (!enrollment) {
+    console.error(`[submitAssignment] Student ${studentId} (${student.email}) is not enrolled in course ${assignment.courseId}`);
+    throw new Error('You are not enrolled in this course. Please contact your administrator to enroll you.');
+  }
+
+  // Check if student has already submitted
+  const existingSubmission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.findFirst({
+      where: {
+        assignmentId,
+        studentId,
+      },
+    })
+  );
+
+  if (existingSubmission) {
+    throw new Error('You have already submitted this assignment');
+  }
+
+  // Validate that at least content or attachments are provided
+  if ((!content || content.trim() === '') && (!attachments || attachments.length === 0)) {
+    throw new Error('Please provide either submission content or attach files');
+  }
+
+  // Create submission
+  console.log(`[submitAssignment] Creating submission for student ${studentId} on assignment ${assignmentId}`);
+  
+  const submission = await retryDbOperation(() =>
+    prisma.assignmentSubmission.create({
+      data: {
+        assignmentId,
+        studentId,
+        content: content || null,
+        attachments,
+        status: 'SUBMITTED',
+      },
+      include: {
+        assignment: {
+          select: {
+            title: true,
+            course: {
+              select: {
+                code: true,
+                title: true,
+              },
+            },
+          },
+        },
+      },
+    })
+  );
+
+  console.log(`[submitAssignment] Successfully created submission ${submission.id} for student ${studentId}`);
+
+  return {
+    id: submission.id,
+    assignmentId: submission.assignmentId,
+    assignmentTitle: submission.assignment.title,
+    studentId: submission.studentId,
+    content: submission.content || undefined,
+    attachments: submission.attachments,
+    submittedAt: submission.submittedAt.toISOString(),
+    status: submission.status,
+  };
+}
+
+
+

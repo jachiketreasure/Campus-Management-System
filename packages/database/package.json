@@ -1,0 +1,46 @@
+{
+  "name": "@cms/database",
+  "version": "1.0.0",
+  "description": "Shared Prisma client and migrations for CMS platform.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "db:push": "node scripts/db-push.js",
+    "studio": "prisma studio",
+    "seed": "tsx src/seed.ts",
+    "seed:courses": "tsx src/seed-courses.ts",
+    "seed:100-level": "tsx src/seed-100-level-courses.ts",
+    "seed:all-courses": "tsx src/seed-all-courses.ts",
+    "update:courses": "tsx src/update-courses-with-levels.ts",
+    "link-courses-to-sessions": "tsx src/link-courses-to-sessions.ts",
+    "create-admin": "tsx src/create-admin.ts",
+    "create-default-admin": "tsx src/create-default-admin.ts",
+    "check-user": "tsx src/check-user.ts",
+    "create-original-admin": "tsx src/create-original-admin.ts",
+    "restore-admin": "tsx src/restore-original-admin.ts",
+    "restore-admin-access": "tsx src/restore-admin-access.ts",
+    "fix-user-admin": "tsx src/fix-user-admin-role.ts",
+    "init-staff-ids": "tsx src/init-staff-ids.ts",
+    "migrate-staff-ids": "tsx src/migrate-staff-ids.ts",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "prisma": "^6.19.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

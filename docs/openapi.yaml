@@ -1,0 +1,774 @@
+openapi: 3.1.0
+info:
+  title: Campus Management System API
+  version: 0.1.0
+  description: >
+    Initial specification covering core authentication, freelancer hub, attendance, and exam integrity endpoints.
+servers:
+  - url: https://api.cms.local/v1
+    description: Local development
+security:
+  - bearerAuth: []
+paths:
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /gigs:
+    get:
+      summary: List gigs
+      operationId: listGigs
+      parameters:
+        - $ref: '#/components/parameters/PageNumber'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/GigStatus'
+      responses:
+        '200':
+          description: List of gigs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GigListResponse'
+    post:
+      summary: Create gig
+      operationId: createGig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGigInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GigResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /gigs/{gigId}:
+    get:
+      summary: Get gig detail
+      operationId: getGig
+      parameters:
+        - $ref: '#/components/parameters/GigId'
+      responses:
+        '200':
+          description: Gig detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GigResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update gig
+      operationId: updateGig
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GigId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGigInput'
+      responses:
+        '200':
+          description: Updated gig
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GigResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /gigs/{gigId}/proposals:
+    post:
+      summary: Submit proposal
+      operationId: createProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GigId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProposalInput'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+
+  /orders:
+    post:
+      summary: Create order
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderInput'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+  /attendance/sessions:
+    get:
+      summary: List attendance sessions
+      operationId: listAttendanceSessions
+      parameters:
+        - $ref: '#/components/parameters/PageNumber'
+        - $ref: '#/components/parameters/PageSize'
+        - name: courseId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AttendanceSessionStatus'
+      responses:
+        '200':
+          description: Attendance sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSessionListResponse'
+    post:
+      summary: Create attendance session
+      operationId: createAttendanceSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAttendanceSessionInput'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSessionResponse'
+
+  /attendance/qr-checkin:
+    post:
+      summary: Submit QR attendance check-in
+      operationId: qrCheckin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QrCheckinInput'
+      responses:
+        '200':
+          description: Check-in success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecordResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /exams:
+    post:
+      summary: Create exam session
+      operationId: createExamSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExamSessionInput'
+      responses:
+        '201':
+          description: Exam session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamSessionResponse'
+
+  /exams/{examId}/events:
+    get:
+      summary: List malpractice events for an exam
+      operationId: listMalpracticeEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExamId'
+      responses:
+        '200':
+          description: Events list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MalpracticeEventListResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageNumber:
+      name: page[number]
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page[size]
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    GigId:
+      name: gigId
+      in: path
+      required: true
+      schema:
+        type: string
+    ExamId:
+      name: examId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [ADMIN, LECTURER, STUDENT]
+
+    GigStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED]
+
+    Gig:
+      type: object
+      properties:
+        id:
+          type: string
+        ownerId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+        deliveryTimeDays:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        attachments:
+          type: array
+          items:
+            type: string
+            format: uri
+        status:
+          $ref: '#/components/schemas/GigStatus'
+        ratingAvg:
+          type: number
+          format: float
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GigListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Gig'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    GigResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Gig'
+
+    CreateGigInput:
+      type: object
+      required: [title, description, category, price, deliveryTimeDays]
+      properties:
+        title:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          default: NGN
+        deliveryTimeDays:
+          type: integer
+          minimum: 1
+        tags:
+          type: array
+          items:
+            type: string
+        attachments:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    UpdateGigInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+        deliveryTimeDays:
+          type: integer
+        status:
+          $ref: '#/components/schemas/GigStatus'
+
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+        gigId:
+          type: string
+        proposerId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN]
+        amount:
+          type: number
+        deliveryTimeDays:
+          type: integer
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ProposalResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Proposal'
+
+    CreateProposalInput:
+      type: object
+      required: [message, amount, deliveryTimeDays]
+      properties:
+        message:
+          type: string
+          maxLength: 5000
+        amount:
+          type: number
+          minimum: 0
+        deliveryTimeDays:
+          type: integer
+          minimum: 1
+
+    OrderStatus:
+      type: string
+      enum: [PENDING, IN_PROGRESS, COMPLETED, CANCELLED, DISPUTED]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        gigId:
+          type: string
+        buyerId:
+          type: string
+        sellerId:
+          type: string
+        amount:
+          type: number
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        escrowReleased:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrderResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Order'
+
+    CreateOrderInput:
+      type: object
+      required: [gigId, buyerId]
+      properties:
+        gigId:
+          type: string
+        buyerId:
+          type: string
+        proposalId:
+          type: string
+
+    AttendanceSessionStatus:
+      type: string
+      enum: [SCHEDULED, OPEN, CLOSED, CANCELLED]
+
+    AttendanceMode:
+      type: string
+      enum: [QR, BIOMETRIC, DIGITAL]
+
+    AttendanceSession:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        lecturerId:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        mode:
+          $ref: '#/components/schemas/AttendanceMode'
+        status:
+          $ref: '#/components/schemas/AttendanceSessionStatus'
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    AttendanceSessionResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AttendanceSession'
+
+    AttendanceSessionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceSession'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    CreateAttendanceSessionInput:
+      type: object
+      required: [courseId, scheduledAt, mode]
+      properties:
+        courseId:
+          type: string
+        title:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        mode:
+          $ref: '#/components/schemas/AttendanceMode'
+        metadata:
+          type: object
+
+    QrCheckinInput:
+      type: object
+      required: [sessionId, token]
+      properties:
+        sessionId:
+          type: string
+        token:
+          type: string
+        location:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        device:
+          type: object
+          properties:
+            id:
+              type: string
+            platform:
+              type: string
+
+    AttendanceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        status:
+          type: string
+          enum: [PRESENT, ABSENT, LATE, EXCUSED]
+        mode:
+          $ref: '#/components/schemas/AttendanceMode'
+        checkedInAt:
+          type: string
+          format: date-time
+
+    AttendanceRecordResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AttendanceRecord'
+
+    ExamSessionStatus:
+      type: string
+      enum: [SCHEDULED, LIVE, COMPLETED, CANCELLED]
+
+    MalpracticeSeverity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+
+    MalpracticeResolutionStatus:
+      type: string
+      enum: [PENDING, UNDER_REVIEW, CONFIRMED, DISMISSED, RESOLVED]
+
+    ExamSession:
+      type: object
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        lecturerId:
+          type: string
+        title:
+          type: string
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        proctoringEnabled:
+          type: boolean
+        consentRequired:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/ExamSessionStatus'
+
+    ExamSessionResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ExamSession'
+
+    CreateExamSessionInput:
+      type: object
+      required: [courseId, title, scheduledStart]
+      properties:
+        courseId:
+          type: string
+        title:
+          type: string
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        monitoring:
+          type: object
+        thresholds:
+          type: object
+        consentRequired:
+          type: boolean
+        retentionDays:
+          type: integer
+
+    MalpracticeEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        examSessionId:
+          type: string
+        studentId:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+        severity:
+          $ref: '#/components/schemas/MalpracticeSeverity'
+        confidenceScore:
+          type: number
+          format: float
+        status:
+          $ref: '#/components/schemas/MalpracticeResolutionStatus'
+        triggeredAt:
+          type: string
+          format: date-time
+
+    MalpracticeEventListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MalpracticeEvent'
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type:
+

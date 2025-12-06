@@ -1,0 +1,363 @@
+[
+  {
+    "session": "2022–2023",
+    "currentLevel": "300 LEVEL",
+    "semester": "FIRST SEMESTER",
+    "courses": [
+      {
+        "courseCode": "GST 103",
+        "courseTitle": "NIGERIAN PEOPLES AND CULTURE",
+        "unit": 2,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "GST 102",
+        "courseTitle": "PHILOSOPHY AND LOGIC",
+        "unit": 2,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "STA 101",
+        "courseTitle": "INTRODUCTION TO STATISTICS",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "GST 101",
+        "courseTitle": "USE OF ENGLISH I",
+        "unit": 2,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "PHY 191/193",
+        "courseTitle": "PRACTICAL PHYSICS I",
+        "unit": 1,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "BIO 191",
+        "courseTitle": "PRACTICAL BIOLOGY I",
+        "unit": 1,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "MAT 101",
+        "courseTitle": "ALGEBRA & MATRIX",
+        "unit": 3,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "CSC 101",
+        "courseTitle": "INTRODUCTION TO COMPUTER SCIENCE",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "PHY 101",
+        "courseTitle": "GENERAL PHYSICS I",
+        "unit": 3,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "BIO 101",
+        "courseTitle": "GENERAL BIOLOGY I",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "ICH 191",
+        "courseTitle": "GENERAL CHEMISTRY PRACTICAL I",
+        "unit": 1,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "ICH 101",
+        "courseTitle": "GENERAL CHEMISTRY I (INORGANIC)",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "GST 105",
+        "courseTitle": "INTRODUCTION TO IGBO LANGUAGE AND CULTURE",
+        "unit": 1,
+        "courseType": "COMPULSORY"
+      }
+    ]
+  },
+  {
+    "session": "2022–2023",
+    "currentLevel": "300 LEVEL",
+    "semester": "SECOND SEMESTER",
+    "courses": [
+      {
+        "courseCode": "CSC 112",
+        "courseTitle": "INTRODUCTION TO COMPUTER PROGRAMMING",
+        "unit": 3,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "GST 107",
+        "courseTitle": "USE OF ENGLISH II",
+        "unit": 2,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "MAT 102",
+        "courseTitle": "CALCULUS & TRIGONOMETRY",
+        "unit": 3,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "BIO 102",
+        "courseTitle": "GENERAL BIOLOGY II",
+        "unit": 2,
+        "courseType": "ELECTIVE"
+      },
+      {
+        "courseCode": "MAT 104",
+        "courseTitle": "VECTORS AND COORDINATE GEOMETRY",
+        "unit": 2,
+        "courseType": "ANCILLARY"
+      },
+      {
+        "courseCode": "CSC 102",
+        "courseTitle": "INTRODUCTION TO COMPUTER SYSTEMS I",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "PHY 192",
+        "courseTitle": "GENERAL PRACTICAL PHYSICS II",
+        "unit": 1,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "GST 106",
+        "courseTitle": "SOCIAL SCIENCES",
+        "unit": 2,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "BIO 192",
+        "courseTitle": "GENERAL BIOLOGY PRACTICALS II",
+        "unit": 1,
+        "courseType": "ELECTIVE"
+      },
+      {
+        "courseCode": "PHY 102",
+        "courseTitle": "GENERAL PHYSICS II",
+        "unit": 3,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "GST 108",
+        "courseTitle": "INTRODUCTION TO IGBO LANGUAGE AND CULTURE II",
+        "unit": 1,
+        "courseType": "COMPULSORY"
+      }
+    ]
+  },
+  {
+    "session": "2023–2024",
+    "currentLevel": "300 LEVEL",
+    "semester": "FIRST SEMESTER",
+    "courses": [
+      {
+        "courseCode": "CSC 231",
+        "courseTitle": "DATA STRUCTURE AND ALGORITHMS",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "MAT 201",
+        "courseTitle": "MATHEMATICAL METHODS I",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "CSC 221B",
+        "courseTitle": "COMPUTER INFORMATION TECHNOLOGY AND INTERNET CONCEPT",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "GST 201",
+        "courseTitle": "ENTREPRENEURIAL STUDIES I",
+        "unit": 1,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "CSC 215B",
+        "courseTitle": "LOW LEVEL PROGRAMMING",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "STA 201",
+        "courseTitle": "STATISTICS FOR APPLIED SCIENCES",
+        "unit": 2,
+        "courseType": "ELECTIVE"
+      },
+      {
+        "courseCode": "MAT 211B",
+        "courseTitle": "SET, LOGICS & ALGEBRA",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "CSC 217",
+        "courseTitle": "STRUCTURED AND VISUAL PROGRAMMING",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "CSC 213B",
+        "courseTitle": "SEQUENTIAL PROGRAMMING AND FILE PROCESSING",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "PHY 261B",
+        "courseTitle": "MODERN PHYSICS",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      }
+    ]
+  },
+  {
+    "session": "2023–2024",
+    "currentLevel": "300 LEVEL",
+    "semester": "SECOND SEMESTER",
+    "courses": [
+      {
+        "courseCode": "CSC 216",
+        "courseTitle": "INTERNET PROGRAMMING",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "CSC 242B",
+        "courseTitle": "DIGITAL DESIGN AND LOGICS",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "MAT 212",
+        "courseTitle": "INTRODUCTION TO REAL ANALYSIS",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "MAT 202B",
+        "courseTitle": "MATHEMATICAL METHODS II",
+        "unit": 2,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "CSC 204",
+        "courseTitle": "DATABASE CREATION MANAGEMENT",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "CSC 226",
+        "courseTitle": "SYSTEM ANALYSIS AND DESIGN",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "PHY 262B",
+        "courseTitle": "ELECTRIC CIRCUIT AND ELECTRONICS",
+        "unit": 3,
+        "courseType": "REQUIRED"
+      },
+      {
+        "courseCode": "CSC 232",
+        "courseTitle": "NUMERICAL METHODS I",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      }
+    ]
+  },
+  {
+    "session": "2024–2025",
+    "currentLevel": "300 LEVEL",
+    "semester": "FIRST SEMESTER",
+    "courses": [
+      {
+        "courseCode": "CSC 313",
+        "courseTitle": "SURVEY OF PROGRAMMING LANGUAGES",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "CSC 321",
+        "courseTitle": "COMPILER CONSTRUCTION I",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "CSC 303",
+        "courseTitle": "CLOUD COMPUTING",
+        "unit": 2,
+        "courseType": "ELECTIVE"
+      },
+      {
+        "courseCode": "GST 301",
+        "courseTitle": "ENTREPRENEURIAL STUDIES",
+        "unit": 1,
+        "courseType": "GENERAL STUDIES"
+      },
+      {
+        "courseCode": "CSC 343",
+        "courseTitle": "COMPUTER ARCHITECTURE",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      },
+      {
+        "courseCode": "CSC 311B",
+        "courseTitle": "OBJECT ORIENTED PROGRAMMING",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "STA 331",
+        "courseTitle": "STATISTICAL INFERENCE III",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "CSC 333B",
+        "courseTitle": "DISCRETE STRUCTURE",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "CSC 325B",
+        "courseTitle": "SOFTWARE ENGINEERING",
+        "unit": 2,
+        "courseType": "CORE"
+      },
+      {
+        "courseCode": "CSC 323",
+        "courseTitle": "OPERATING SYSTEMS I",
+        "unit": 2,
+        "courseType": "COMPULSORY"
+      }
+    ]
+  },
+  {
+    "session": "2024–2025",
+    "currentLevel": "300 LEVEL",
+    "semester": "SECOND SEMESTER",
+    "courses": [
+      {
+        "courseCode": "CSC 398",
+        "courseTitle": "SIWES",
+        "unit": 18,
+        "courseType": "COMPULSORY"
+      }
+    ]
+  }
+]
+
