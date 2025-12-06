@@ -87,7 +87,7 @@ type GigRecord = {
   title: string;
   description: string;
   category: string;
-  price: Prisma.Decimal | number;
+  price: number;
   currency: string;
   deliveryTimeDays: number;
   attachments: string[] | null;
@@ -115,15 +115,15 @@ const toDTO = (gig: GigRecord): GigDTO => ({
 
 export async function listGigs(filters: GigFilters = {}): Promise<GigDTO[]> {
   if (usePrismaStore) {
-    const where: Prisma.GigWhereInput = {
+    const where: any = {
       ...(filters.category ? { category: filters.category } : {}),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.ownerId ? { ownerId: filters.ownerId } : {}),
       ...(filters.minPrice || filters.maxPrice
         ? {
             price: {
-              ...(typeof filters.minPrice === 'number' ? { gte: new Prisma.Decimal(filters.minPrice) } : {}),
-              ...(typeof filters.maxPrice === 'number' ? { lte: new Prisma.Decimal(filters.maxPrice) } : {})
+              ...(typeof filters.minPrice === 'number' ? { gte: filters.minPrice } : {}),
+              ...(typeof filters.maxPrice === 'number' ? { lte: filters.maxPrice } : {})
             }
           }
         : {}),
@@ -211,7 +211,7 @@ export async function createGig(ownerId: string, input: GigCreateInput): Promise
     const created = await prisma.gig.create({
       data: {
         ...payload,
-        price: new Prisma.Decimal(payload.price),
+        price: payload.price,
         ownerId
       }
     });
@@ -253,7 +253,7 @@ export async function updateGig(
         ...(input.title ? { title: input.title } : {}),
         ...(input.description ? { description: input.description } : {}),
         ...(input.category ? { category: input.category } : {}),
-        ...(typeof input.price === 'number' ? { price: new Prisma.Decimal(input.price) } : {}),
+        ...(typeof input.price === 'number' ? { price: input.price } : {}),
         ...(input.currency ? { currency: input.currency } : {}),
         ...(typeof input.deliveryTimeDays === 'number' ? { deliveryTimeDays: input.deliveryTimeDays } : {}),
         ...(input.attachments ? { attachments: input.attachments } : {}),

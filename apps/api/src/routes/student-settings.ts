@@ -141,14 +141,14 @@ export const studentSettingsRoutes: FastifyPluginAsync = async (app) => {
           where: { id: studentId },
           select: { cohortSessionId: true },
         })
-      );
+      ) as { cohortSessionId?: string } | null;
 
       // Assign student to new level and session
       await assignStudentToLevelSession(
         studentId,
         body.level,
         body.sessionId,
-        student?.cohortSessionId || body.sessionId
+        (student as any)?.cohortSessionId || body.sessionId
       );
 
       const updatedInfo = await getStudentCurrentLevelInfo(studentId);
@@ -232,7 +232,7 @@ export const studentSettingsRoutes: FastifyPluginAsync = async (app) => {
           where: { id: studentId },
           select: { cohortSessionId: true },
         })
-      );
+      ) as { cohortSessionId?: string } | null;
 
       // Update both level/session and course of study
       await Promise.all([
@@ -240,7 +240,7 @@ export const studentSettingsRoutes: FastifyPluginAsync = async (app) => {
           studentId,
           body.level,
           body.sessionId,
-          student?.cohortSessionId || body.sessionId
+          (student as any)?.cohortSessionId || body.sessionId
         ),
         retryDbOperation(() =>
           prisma.visitor.update({
@@ -262,6 +262,7 @@ export const studentSettingsRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 };
+
 
 
 

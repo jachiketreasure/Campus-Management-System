@@ -16,7 +16,7 @@ const createSessionSchema = z.object({
   courseId: z.string(),
   scheduledAt: z.string(),
   mode: z.enum(['QR', 'BIOMETRIC', 'DIGITAL']),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 });
 
 const querySchema = z.object({

@@ -201,7 +201,7 @@ export const studentRegistrationRoutes: FastifyPluginAsync = async (app) => {
       
       const courses = await getAvailableCourses(query.level, query.semester, query.sessionId);
       
-      request.log.info({ count: courses.length, level: query.level, semester: query.semester, sessionId: query.sessionId }, 'Courses fetched successfully');
+      request.log.info({ count: (courses as any[]).length, level: query.level, semester: query.semester, sessionId: query.sessionId }, 'Courses fetched successfully');
       
       return { data: courses };
     } catch (error: any) {
@@ -271,7 +271,7 @@ export const studentRegistrationRoutes: FastifyPluginAsync = async (app) => {
         registrationNumber = student.registrationNumber;
       }
 
-      const requiredCourses = await getRequiredCoursesForStudent(registrationNumber, query.level);
+      const requiredCourses = await getRequiredCoursesForStudent(registrationNumber || '', query.level || '');
       
       return { data: requiredCourses };
     } catch (error: any) {

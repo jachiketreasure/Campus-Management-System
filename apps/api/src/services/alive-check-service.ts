@@ -57,7 +57,7 @@ function getRandomChallengeType(config: AliveCheckConfig): ChallengeType {
   const types = config.challengeTypes.length > 0 
     ? config.challengeTypes 
     : ['BUTTON_CLICK'];
-  return types[Math.floor(Math.random() * types.length)];
+  return types[Math.floor(Math.random() * types.length)] as ChallengeType;
 }
 
 /**

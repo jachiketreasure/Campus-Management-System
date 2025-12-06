@@ -80,7 +80,7 @@ type SessionRecord = {
   mode: AttendanceMode;
   status: AttendanceSessionStatus;
   qrToken: string | null;
-  metadata: Prisma.JsonValue | null;
+  metadata: Record<string, unknown> | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 };
@@ -105,7 +105,7 @@ type RecordRow = {
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
   mode: AttendanceMode;
   checkedInAt: Date | string;
-  location: Prisma.JsonValue | null;
+  location: Record<string, unknown> | null;
 };
 
 const mapRecord = (record: RecordRow): AttendanceRecordDTO => ({

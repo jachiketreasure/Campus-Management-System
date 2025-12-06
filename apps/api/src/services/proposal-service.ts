@@ -56,7 +56,7 @@ type ProposalRecord = {
   gigId: string;
   proposerId: string;
   message: string;
-  amount: Prisma.Decimal | number;
+  amount: number;
   deliveryTimeDays: number;
   status: ProposalStatus;
   createdAt: Date | string;
@@ -69,7 +69,7 @@ type OrderRecord = {
   buyerId: string;
   sellerId: string;
   proposalId: string | null;
-  amount: Prisma.Decimal | number;
+  amount: number;
   status: OrderStatus;
   escrowReleased: boolean;
   dueDate: Date | string | null;
@@ -119,7 +119,7 @@ export async function createProposal(
     const proposal = await prisma.proposal.create({
       data: {
         ...payload,
-        amount: new Prisma.Decimal(payload.amount)
+        amount: payload.amount
       }
     });
     return mapProposal(proposal);

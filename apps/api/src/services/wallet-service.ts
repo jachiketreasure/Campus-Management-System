@@ -141,7 +141,7 @@ export async function holdEscrow(
       data: {
         walletId: wallet.id,
         orderId,
-        amount: new Prisma.Decimal(amount),
+        amount: amount,
         type: 'HOLD',
         status: 'PENDING',
         reference
