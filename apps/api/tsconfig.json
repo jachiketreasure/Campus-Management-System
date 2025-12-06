@@ -9,10 +9,8 @@
     "noImplicitThis": false,
     "alwaysStrict": false,
     "skipLibCheck": true,
-    "suppressImplicitAnyIndexErrors": true,
     "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noStrictGenericChecks": true
+    "noUnusedParameters": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]
