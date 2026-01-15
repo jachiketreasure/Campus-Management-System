@@ -55,8 +55,8 @@ export const contractsRoutes: FastifyPluginAsync = async (app) => {
         const contract = await createContract(user.id, body);
         return reply.code(201).send({ data: contract });
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 403) {
             return reply.code(403).send({
               errors: [{ code: 'FORBIDDEN', message: error.message }]
@@ -186,8 +186,8 @@ export const contractsRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: contract };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 403) {
             return reply.code(403).send({
               errors: [{ code: 'FORBIDDEN', message: error.message }]
@@ -235,8 +235,8 @@ export const contractsRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: contract };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 403) {
             return reply.code(403).send({
               errors: [{ code: 'FORBIDDEN', message: error.message }]
@@ -284,8 +284,8 @@ export const contractsRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: contract };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 403) {
             return reply.code(403).send({
               errors: [{ code: 'FORBIDDEN', message: error.message }]
