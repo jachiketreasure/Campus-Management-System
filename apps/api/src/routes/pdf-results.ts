@@ -32,7 +32,7 @@ export const pdfResultsRoutes: FastifyPluginAsync = async (app) => {
       const params = z.object({
         studentId: z.string(),
         sessionId: z.string().optional()
-      }).parse({ ...request.params, ...request.query });
+      }).parse({ ...(request.params as any), ...(request.query as any) });
 
       // Students can only view their own results
       if (params.studentId !== user.id && !user.roles?.includes('ADMIN')) {

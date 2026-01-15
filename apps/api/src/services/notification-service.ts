@@ -67,7 +67,7 @@ export async function createNotification(
         title,
         body,
         category,
-        data: data ? (data as Prisma.InputJsonValue) : undefined,
+        data: data ? (data as any) : undefined,
         malpracticeEventId: malpracticeEventId ?? null,
       },
     });

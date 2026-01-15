@@ -47,8 +47,8 @@ export const lecturerAbsenceRoutes: FastifyPluginAsync = async (app) => {
         const absence = await reportLecturerAbsence(user.id, body);
         return reply.code(201).send({ data: absence });
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 404) {
             return reply.code(404).send({
               errors: [{ code: 'NOT_FOUND', message: error.message }]
@@ -87,7 +87,7 @@ export const lecturerAbsenceRoutes: FastifyPluginAsync = async (app) => {
         courseId: z.string(),
         sessionId: z.string(),
         semester: z.string()
-      }).parse({ ...request.params, ...request.query });
+      }).parse({ ...(request.params as any), ...(request.query as any) });
 
       const absences = await getLecturerAbsences(params.courseId, params.sessionId, params.semester);
       return { data: absences };

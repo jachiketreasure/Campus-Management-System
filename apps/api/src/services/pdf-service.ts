@@ -1,4 +1,4 @@
-import { getStudentGrades, getCGPA, type CourseGrade, type CGPABreakdown } from './grade-service';
+import { getStudentGrades, type CourseGradeDTO } from './grade-service';
 import { prisma } from '@cms/database';
 
 const usePrismaStore = process.env.NEXTAUTH_USE_PRISMA === 'true';

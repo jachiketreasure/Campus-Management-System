@@ -49,7 +49,7 @@ export const gradesRoutes: FastifyPluginAsync = async (app) => {
         studentId: z.string(),
         sessionId: z.string().optional(),
         semester: z.string().optional()
-      }).parse({ ...request.params, ...request.query });
+      }).parse({ ...(request.params as any), ...(request.query as any) });
 
       // Students can only view their own grades
       if (params.studentId !== user.id && !user.roles?.includes('ADMIN')) {
@@ -86,7 +86,7 @@ export const gradesRoutes: FastifyPluginAsync = async (app) => {
         courseId: z.string(),
         sessionId: z.string(),
         semester: z.string()
-      }).parse({ ...request.params, ...request.query });
+      }).parse({ ...(request.params as any), ...(request.query as any) });
 
       // Only lecturers and admins can view course grades
       if (!user.roles?.includes('LECTURER') && !user.roles?.includes('ADMIN')) {
@@ -262,7 +262,7 @@ export const gradesRoutes: FastifyPluginAsync = async (app) => {
         studentId: z.string(),
         sessionId: z.string(),
         semester: z.string()
-      }).parse({ ...request.params, ...request.query });
+      }).parse({ ...(request.params as any), ...(request.query as any) });
 
       if (params.studentId !== user.id && !user.roles?.includes('ADMIN')) {
         return reply.code(403).send({
