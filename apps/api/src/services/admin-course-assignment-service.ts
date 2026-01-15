@@ -228,7 +228,7 @@ export async function getCoursesWithAssignments(sessionId: string, semester?: st
     sessionId: course.sessionId,
     sessionName: course.session?.name || (course.sessionId === null ? 'Unassigned' : ''),
     isUnassigned: course.sessionId === null,
-    assignedLecturers: course.lecturerAssignments.map((assignment) => ({
+    assignedLecturers: course.lecturerAssignments.map((assignment: any) => ({
       id: assignment.id,
       lecturerId: assignment.lecturerId,
       lecturerName: assignment.lecturer.name,

@@ -14,10 +14,13 @@ export type TransactionDTO = {
   id: string;
   walletId: string;
   orderId?: string | null;
+  contractId?: string | null;
   amount: number;
-  type: 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE';
+  type: 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE' | 'DEPOSIT' | 'REFUND';
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   reference: string;
+  fromUserId?: string | null;
+  toUserId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,10 +56,13 @@ type TransactionRecord = {
   id: string;
   walletId: string;
   orderId: string | null;
+  contractId: string | null;
   amount: number;
-  type: 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE';
+  type: 'CREDIT' | 'DEBIT' | 'HOLD' | 'RELEASE' | 'DEPOSIT' | 'REFUND';
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   reference: string;
+  fromUserId: string | null;
+  toUserId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 };
@@ -65,10 +71,13 @@ const mapTransaction = (tx: TransactionRecord): TransactionDTO => ({
   id: tx.id,
   walletId: tx.walletId,
   orderId: tx.orderId,
+  contractId: tx.contractId,
   amount: Number(tx.amount),
   type: tx.type,
   status: tx.status,
   reference: tx.reference,
+  fromUserId: tx.fromUserId,
+  toUserId: tx.toUserId,
   createdAt: tx.createdAt instanceof Date ? tx.createdAt.toISOString() : tx.createdAt,
   updatedAt: tx.updatedAt instanceof Date ? tx.updatedAt.toISOString() : tx.updatedAt
 });
@@ -279,5 +288,248 @@ export async function createDispute(
   };
   demoDisputes.push(dispute);
   return dispute;
+}
+
+/**
+ * Deposit payment into escrow for a contract
+ * This deducts from employer's wallet and holds it in escrow
+ */
+export async function depositToEscrow(
+  contractId: string,
+  employerId: string,
+  amount: number
+): Promise<TransactionDTO> {
+  if (usePrismaStore) {
+    // Verify contract exists and user is the employer
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        gig: {
+          select: {
+            title: true
+          }
+        }
+      }
+    });
+
+    if (!contract) {
+      const error = new Error('Contract not found');
+      Object.assign(error, { statusCode: 404 });
+      throw error;
+    }
+
+    if (contract.employerId !== employerId) {
+      const error = new Error('Only the employer can deposit to escrow');
+      Object.assign(error, { statusCode: 403 });
+      throw error;
+    }
+
+    if (contract.status !== 'ACTIVE') {
+      const error = new Error('Contract must be active to deposit');
+      Object.assign(error, { statusCode: 400 });
+      throw error;
+    }
+
+    if (Math.abs(contract.agreedPrice - amount) > 0.01) {
+      const error = new Error(`Deposit amount must match agreed price: ₦${contract.agreedPrice}`);
+      Object.assign(error, { statusCode: 400 });
+      throw error;
+    }
+
+    const employerWallet = await prisma.wallet.upsert({
+      where: { userId: employerId },
+      update: {},
+      create: { userId: employerId }
+    });
+
+    // Check if employer has sufficient balance
+    if (Number(employerWallet.balance) < amount) {
+      const error = new Error('Insufficient balance');
+      Object.assign(error, { statusCode: 400 });
+      throw error;
+    }
+
+    const reference = `DEPOSIT-${contractId}-${Date.now()}`;
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      // Deduct from employer wallet
+      await tx.wallet.update({
+        where: { id: employerWallet.id },
+        data: {
+          balance: { decrement: amount }
+        }
+      });
+
+      // Create deposit transaction
+      const depositTx = await tx.transaction.create({
+        data: {
+          walletId: employerWallet.id,
+          contractId,
+          amount,
+          type: 'DEPOSIT',
+          status: 'COMPLETED',
+          reference,
+          fromUserId: employerId,
+          toUserId: null, // Escrow - no recipient yet
+          metadata: {
+            contractId,
+            purpose: 'escrow_deposit'
+          }
+        }
+      });
+
+      // Update contract status to FUNDED
+      await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: 'FUNDED'
+        }
+      });
+
+      return depositTx;
+    });
+
+    return mapTransaction(transaction as TransactionRecord);
+  }
+
+  // Demo mode
+  const wallet = ensureDemoWallet(employerId);
+  if (wallet.balance < amount) {
+    const error = new Error('Insufficient balance');
+    Object.assign(error, { statusCode: 400 });
+    throw error;
+  }
+
+  wallet.balance -= amount;
+  const now = new Date().toISOString();
+  const transaction: TransactionDTO = {
+    id: randomUUID(),
+    walletId: employerId,
+    contractId,
+    amount,
+    type: 'DEPOSIT',
+    status: 'COMPLETED',
+    reference: `DEPOSIT-${contractId}-${Date.now()}`,
+    fromUserId: employerId,
+    toUserId: null,
+    createdAt: now,
+    updatedAt: now
+  };
+  demoTransactions.push(transaction);
+  return transaction;
+}
+
+/**
+ * Release escrow payment to worker when work is approved
+ */
+export async function releaseContractEscrow(
+  contractId: string
+): Promise<TransactionDTO | null> {
+  if (usePrismaStore) {
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        gig: {
+          select: {
+            title: true
+          }
+        }
+      }
+    });
+
+    if (!contract) {
+      return null;
+    }
+
+    if (contract.status !== 'COMPLETED') {
+      const error = new Error('Contract must be completed to release payment');
+      Object.assign(error, { statusCode: 400 });
+      throw error;
+    }
+
+    // Check if payment already released
+    const existingRelease = await prisma.transaction.findFirst({
+      where: {
+        contractId,
+        type: 'RELEASE',
+        status: 'COMPLETED'
+      }
+    });
+
+    if (existingRelease) {
+      const error = new Error('Payment already released');
+      Object.assign(error, { statusCode: 409 });
+      throw error;
+    }
+
+    const workerWallet = await prisma.wallet.upsert({
+      where: { userId: contract.workerId },
+      update: {},
+      create: { userId: contract.workerId }
+    });
+
+    const reference = `RELEASE-${contractId}-${Date.now()}`;
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      // Credit worker wallet
+      await tx.wallet.update({
+        where: { id: workerWallet.id },
+        data: {
+          balance: { increment: contract.agreedPrice }
+        }
+      });
+
+      // Create release transaction
+      const releaseTx = await tx.transaction.create({
+        data: {
+          walletId: workerWallet.id,
+          contractId,
+          amount: contract.agreedPrice,
+          type: 'RELEASE',
+          status: 'COMPLETED',
+          reference,
+          fromUserId: null, // From escrow
+          toUserId: contract.workerId,
+          metadata: {
+            contractId,
+            purpose: 'escrow_release'
+          }
+        }
+      });
+
+      return releaseTx;
+    });
+
+    return mapTransaction(transaction as TransactionRecord);
+  }
+
+  // Demo mode
+  const txIndex = demoTransactions.findIndex(
+    (tx) => tx.contractId === contractId && tx.type === 'DEPOSIT' && tx.status === 'COMPLETED'
+  );
+  if (txIndex === -1) {
+    return null;
+  }
+
+  const deposit = demoTransactions[txIndex];
+  const workerWallet = ensureDemoWallet(deposit.toUserId || 'worker');
+  workerWallet.balance += deposit.amount;
+
+  const now = new Date().toISOString();
+  const releaseTx: TransactionDTO = {
+    id: randomUUID(),
+    walletId: deposit.toUserId || 'worker',
+    contractId,
+    amount: deposit.amount,
+    type: 'RELEASE',
+    status: 'COMPLETED',
+    reference: `RELEASE-${contractId}-${Date.now()}`,
+    fromUserId: null,
+    toUserId: deposit.toUserId || 'worker',
+    createdAt: now,
+    updatedAt: now
+  };
+  demoTransactions.push(releaseTx);
+  return releaseTx;
 }
 

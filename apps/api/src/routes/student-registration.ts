@@ -21,6 +21,7 @@ const registrationSchema = z.object({
   sessionId: z.string().min(1),
   registrationNumber: z.string().min(1),
   academicLevel: z.string().min(1),
+  semester: z.string().optional(), // Semester is optional for backward compatibility
   courseIds: z.array(z.string()).min(1),
 });
 
@@ -181,6 +182,33 @@ export const studentRegistrationRoutes: FastifyPluginAsync = async (app) => {
       const courses = await getStudentCourses(studentId);
       return { data: courses };
     } catch (error: any) {
+      return reply.code(400).send({
+        errors: [{ code: 'BAD_REQUEST', message: error.message }]
+      });
+    }
+  });
+
+  // Get allowed levels for a student based on their progression
+  app.get('/students/:studentId/allowed-levels', {
+    preHandler: authGuard
+  }, async (request, reply) => {
+    try {
+      const userId = (request as any).userId;
+      const params = z.object({ studentId: z.string() }).parse(request.params);
+      
+      // Ensure student can only view their own allowed levels
+      if (params.studentId !== userId) {
+        return reply.code(403).send({
+          errors: [{ code: 'FORBIDDEN', message: 'Access denied' }]
+        });
+      }
+
+      const { getAllowedLevels } = await import('../services/student-level-validation-service');
+      const allowedLevels = await getAllowedLevels(params.studentId);
+      
+      return { data: { allowedLevels } };
+    } catch (error: any) {
+      request.log.error({ err: error, studentId: (request as any).userId }, 'Error fetching allowed levels');
       return reply.code(400).send({
         errors: [{ code: 'BAD_REQUEST', message: error.message }]
       });

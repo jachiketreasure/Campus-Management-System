@@ -108,16 +108,49 @@ export async function createExamIntegrity(input: CreateExamIntegrityInput) {
     },
   });
 
-  // Create notification for admins (we'll use a special userId "admin" for now)
-  // In production, you'd query all admin users and create notifications for each
-  await prisma.examNotification.create({
-    data: {
-      userId: 'admin', // All admins should see this
-      examId: exam.id,
-      message: `New exam "${exam.title}" submitted by ${lecturer.name} for review`,
-      seen: false,
-    }, 
+  // Create notification for all admin users
+  const adminUsers = await prisma.user.findMany({
+    where: {
+      roleAssignments: {
+        some: {
+          role: {
+            name: 'ADMIN'
+          }
+        }
+      }
+    },
+    select: { id: true }
   });
+  
+  const adminVisitors = await prisma.visitor.findMany({
+    where: {
+      visitorType: 'ADMIN',
+      status: 'ACTIVE',
+    },
+    select: { id: true }
+  });
+  
+  const allAdminIds = [
+    ...adminUsers.map(u => u.id),
+    ...adminVisitors.map(v => v.id)
+  ];
+  
+  // If no admins found, use 'admin' as fallback for backward compatibility
+  const adminIdsToNotify = allAdminIds.length > 0 ? allAdminIds : ['admin'];
+  
+  // Create notifications for all admins
+  await Promise.all(
+    adminIdsToNotify.map(adminId =>
+      prisma.examNotification.create({
+        data: {
+          userId: adminId,
+          examId: exam.id,
+          message: `New exam "${exam.title}" submitted by ${lecturer.name} for review`,
+          seen: false,
+        },
+      })
+    )
+  );
 
   return exam;
 }
@@ -254,6 +287,104 @@ export async function updateExamIntegrityStatus(
     },
   });
 
+  // If exam is approved, notify all students enrolled in the course
+  if (input.status === 'APPROVED') {
+    try {
+      // Find course by code
+      const course = await prisma.course.findUnique({
+        where: { code: exam.courseCode },
+        select: { id: true },
+      });
+
+      if (course) {
+        // Get all students enrolled in this course
+        const enrollments = await prisma.enrollment.findMany({
+          where: {
+            courseId: course.id,
+            status: 'ACTIVE',
+          },
+          select: {
+            studentId: true,
+          },
+        });
+
+        // Also get students from StudentCourse table
+        const studentCourses = await prisma.studentCourse.findMany({
+          where: {
+            courseId: course.id,
+          },
+          select: {
+            studentId: true,
+          },
+        });
+
+        // Combine and deduplicate student IDs
+        const allStudentIds = [
+          ...new Set([
+            ...enrollments.map((e: any) => e.studentId),
+            ...studentCourses.map((sc: any) => sc.studentId),
+          ]),
+        ];
+
+        // Create notifications for all enrolled students
+        await Promise.all(
+          allStudentIds.map(async (studentId: string) => {
+            try {
+              // Check if student is a User or Visitor
+              const user = await prisma.user.findUnique({
+                where: { id: studentId },
+                select: { id: true },
+              });
+
+              if (user) {
+                // Student is a User - use notification service
+                const { createNotification } = await import('./notification-service');
+                await createNotification(
+                  studentId,
+                  'New Exam Available',
+                  `A new exam "${exam.title}" is now available for ${exam.courseCode}. Start Date: ${new Date(exam.startDate).toLocaleDateString()}`,
+                  'EXAM',
+                  {
+                    type: 'EXAM_APPROVED',
+                    examId: exam.id,
+                    examTitle: exam.title,
+                    courseCode: exam.courseCode,
+                    startDate: exam.startDate,
+                    endDate: exam.endDate,
+                  }
+                );
+              } else {
+                // Student is a Visitor - create notification directly in Prisma
+                await prisma.notification.create({
+                  data: {
+                    userId: studentId,
+                    title: 'New Exam Available',
+                    body: `A new exam "${exam.title}" is now available for ${exam.courseCode}. Start Date: ${new Date(exam.startDate).toLocaleDateString()}`,
+                    category: 'EXAM',
+                    data: {
+                      type: 'EXAM_APPROVED',
+                      examId: exam.id,
+                      examTitle: exam.title,
+                      courseCode: exam.courseCode,
+                      startDate: exam.startDate,
+                      endDate: exam.endDate,
+                    },
+                  },
+                });
+              }
+            } catch (notifError) {
+              // Don't fail exam update if notification fails
+              console.error(`[exam-integrity-service] Failed to notify student ${studentId}:`, notifError);
+            }
+          })
+        );
+      }
+    } catch (error) {
+      // Don't fail exam update if notification fails
+      console.error('[exam-integrity-service] Error creating exam notifications for students:', error);
+    }
+  }
+
   return updatedExam;
 }
 
@@ -272,7 +403,47 @@ export async function createExamAttempt(examId: string, studentId: string) {
     throw new Error('Exam is not approved');
   }
 
-  // Check attempt count
+  // Verify student is registered for this course
+  const { isStudentRegisteredForCourseCode } = await import('./student-access-control-service');
+  const isRegistered = await isStudentRegisteredForCourseCode(studentId, exam.courseCode);
+  
+  if (!isRegistered) {
+    throw new Error(`You are not registered for course ${exam.courseCode}. Please register for the course to access this exam.`);
+  }
+
+  // Check if student already has a SUBMITTED attempt - prevent multiple submissions
+  const submittedAttempt = await prisma.examAttempt.findFirst({
+    where: {
+      examId,
+      studentId,
+      status: 'SUBMITTED',
+    },
+  });
+
+  if (submittedAttempt) {
+    throw new Error('You have already submitted this exam. Only one attempt is allowed.');
+  }
+
+  // Check if student has an IN_PROGRESS attempt - reuse it instead of creating a new one
+  const inProgressAttempt = await prisma.examAttempt.findFirst({
+    where: {
+      examId,
+      studentId,
+      status: 'IN_PROGRESS',
+    },
+  });
+
+  if (inProgressAttempt) {
+    // Return the existing in-progress attempt instead of creating a new one
+    return prisma.examAttempt.findUnique({
+      where: { id: inProgressAttempt.id },
+      include: {
+        exam: true,
+      },
+    });
+  }
+
+  // Check attempt count (for other statuses like COMPLETED, ABANDONED)
   const existingAttempts = await prisma.examAttempt.count({
     where: {
       examId,
@@ -315,12 +486,188 @@ export async function listExamAttemptsForStudent(studentId: string) {
   });
 }
 
+export async function listExamAttemptsForExam(examId: string) {
+  return prisma.examAttempt.findMany({
+    where: { examId },
+    include: {
+      exam: true,
+      student: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          registrationNumber: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function listExamAttemptsForLecturer(lecturerId: string) {
+  // Get all exams created by this lecturer
+  const exams = await prisma.examIntegrity.findMany({
+    where: { lecturerId },
+    select: { id: true },
+  });
+
+  const examIds = exams.map((exam) => exam.id);
+
+  if (examIds.length === 0) {
+    return [];
+  }
+
+  return prisma.examAttempt.findMany({
+    where: {
+      examId: { in: examIds },
+    },
+    include: {
+      exam: true,
+      student: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          registrationNumber: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/**
+ * Automatically grade MCQ questions by comparing student answers with correct answers
+ * Returns the total score and detailed breakdown
+ */
+export async function gradeExamAttempt(
+  examId: string,
+  studentAnswers: Record<string, any>
+): Promise<{ totalScore: number; maxScore: number; breakdown: Array<{ questionId: string; correct: boolean; score: number; maxScore: number }> }> {
+  // Get the exam with questions
+  const exam = await prisma.examIntegrity.findUnique({
+    where: { id: examId },
+    select: {
+      questions: true,
+    },
+  });
+
+  if (!exam) {
+    throw new Error('Exam not found');
+  }
+
+  const questions = exam.questions as ExamIntegrityQuestion[];
+  let totalScore = 0;
+  let maxScore = 0;
+  const breakdown: Array<{ questionId: string; correct: boolean; score: number; maxScore: number }> = [];
+
+  for (const question of questions) {
+    maxScore += question.marks;
+    
+    // Only auto-grade MCQ questions
+    if (question.type === 'MCQ' && question.correctAnswer !== undefined) {
+      const studentAnswer = studentAnswers[question.id];
+      const isCorrect = studentAnswer !== undefined && 
+                       String(studentAnswer).trim() === String(question.correctAnswer).trim();
+      
+      const score = isCorrect ? question.marks : 0;
+      totalScore += score;
+      
+      breakdown.push({
+        questionId: question.id,
+        correct: isCorrect,
+        score,
+        maxScore: question.marks,
+      });
+    } else {
+      // Theory questions are not auto-graded
+      breakdown.push({
+        questionId: question.id,
+        correct: false,
+        score: 0,
+        maxScore: question.marks,
+      });
+    }
+  }
+
+  return { totalScore, maxScore, breakdown };
+}
+
+/**
+ * Get exam questions without exposing correct answers to students/admins
+ * Only lecturers who created the exam can see correct answers
+ */
+export async function getExamQuestionsForStudent(examId: string): Promise<ExamIntegrityQuestion[]> {
+  const exam = await prisma.examIntegrity.findUnique({
+    where: { id: examId },
+    select: {
+      questions: true,
+    },
+  });
+
+  if (!exam) {
+    throw new Error('Exam not found');
+  }
+
+  const questions = exam.questions as ExamIntegrityQuestion[];
+  
+  // Remove correctAnswer from questions for students
+  return questions.map(({ correctAnswer, ...question }) => question);
+}
+
+/**
+ * Get exam questions with correct answers (only for lecturer who created the exam)
+ */
+export async function getExamQuestionsForLecturer(examId: string, lecturerId: string): Promise<ExamIntegrityQuestion[]> {
+  const exam = await prisma.examIntegrity.findUnique({
+    where: { id: examId },
+    select: {
+      lecturerId: true,
+      questions: true,
+    },
+  });
+
+  if (!exam) {
+    throw new Error('Exam not found');
+  }
+
+  if (exam.lecturerId !== lecturerId) {
+    throw new Error('Unauthorized: Only the exam creator can view correct answers');
+  }
+
+  return exam.questions as ExamIntegrityQuestion[];
+}
+
 export async function updateExamAttempt(attemptId: string, data: {
   status?: ExamAttemptStatus;
   score?: number;
   answers?: any;
   endTime?: Date;
 }) {
+  const attempt = await prisma.examAttempt.findUnique({
+    where: { id: attemptId },
+    include: {
+      exam: true,
+    },
+  });
+
+  if (!attempt) {
+    throw new Error('Attempt not found');
+  }
+
+  // If status is SUBMITTED and we have answers, automatically grade MCQ questions
+  if (data.status === 'SUBMITTED' && data.answers && !data.score) {
+    try {
+      const gradingResult = await gradeExamAttempt(attempt.examId, data.answers);
+      data.score = gradingResult.totalScore;
+      
+      console.log(`[Exam Grading] Auto-graded attempt ${attemptId}: ${gradingResult.totalScore}/${gradingResult.maxScore}`);
+    } catch (error) {
+      console.error('[Exam Grading] Error auto-grading attempt:', error);
+      // Don't fail submission if grading fails, but log the error
+    }
+  }
+
   return prisma.examAttempt.update({
     where: { id: attemptId },
     data: {

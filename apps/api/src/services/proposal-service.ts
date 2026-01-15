@@ -1,6 +1,8 @@
 import { Prisma, prisma } from '@cms/database';
 import { randomUUID } from 'crypto';
 import { holdEscrow } from './wallet-service';
+import { notifyProposalAccepted, notifyProposalRejected, notifyNewProposal } from './notification-service';
+import { getGigById } from './gig-service';
 
 const usePrismaStore = process.env.NEXTAUTH_USE_PRISMA === 'true';
 
@@ -122,6 +124,20 @@ export async function createProposal(
         amount: payload.amount
       }
     });
+    
+    // Notify gig owner about new proposal
+    try {
+      const gig = await getGigById(payload.gigId);
+      if (gig) {
+        const proposer = await prisma.user.findUnique({ where: { id: proposerId }, select: { firstName: true, lastName: true } });
+        const proposerName = proposer ? `${proposer.firstName} ${proposer.lastName}` : 'A student';
+        await notifyNewProposal(gig.ownerId, gig.title, proposerName);
+      }
+    } catch (error) {
+      // Don't fail proposal creation if notification fails
+      console.error('Error sending new proposal notification:', error);
+    }
+    
     return mapProposal(proposal);
   }
 
@@ -134,6 +150,17 @@ export async function createProposal(
     ...payload
   };
   demoProposals.push(proposal);
+  
+  // Notify gig owner about new proposal (demo mode)
+  try {
+    const gig = await getGigById(payload.gigId);
+    if (gig) {
+      await notifyNewProposal(gig.ownerId, gig.title, 'A student');
+    }
+  } catch (error) {
+    console.error('Error sending new proposal notification:', error);
+  }
+  
   return proposal;
 }
 
@@ -182,6 +209,16 @@ export async function acceptProposal(
 
     await holdEscrow(sellerId, order.id, Number(proposal.amount), `ESCROW-${order.id}`);
 
+    // Notify proposer about acceptance
+    try {
+      const gig = await getGigById(proposal.gigId);
+      if (gig) {
+        await notifyProposalAccepted(proposal.proposerId, gig.title, Number(proposal.amount));
+      }
+    } catch (error) {
+      console.error('Error sending proposal accepted notification:', error);
+    }
+
     return mapOrder(order);
   }
 
@@ -212,7 +249,67 @@ export async function acceptProposal(
 
   demoOrders.push(order);
   await holdEscrow(sellerId, order.id, order.amount, `ESCROW-${order.id}`);
+  
+  // Notify proposer about acceptance (demo mode)
+  try {
+    const gig = await getGigById(demoProposals[index].gigId);
+    if (gig) {
+      await notifyProposalAccepted(demoProposals[index].proposerId, gig.title, demoProposals[index].amount);
+    }
+  } catch (error) {
+    console.error('Error sending proposal accepted notification:', error);
+  }
+  
   return order;
+}
+
+export async function rejectProposal(proposalId: string): Promise<ProposalDTO> {
+  if (usePrismaStore) {
+    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) {
+      throw Object.assign(new Error('Proposal not found'), { statusCode: 404 });
+    }
+
+    const updated = await prisma.proposal.update({
+      where: { id: proposalId },
+      data: { status: 'REJECTED', updatedAt: new Date() }
+    });
+    
+    // Notify proposer about rejection
+    try {
+      const gig = await getGigById(proposal.gigId);
+      if (gig) {
+        await notifyProposalRejected(proposal.proposerId, gig.title);
+      }
+    } catch (error) {
+      console.error('Error sending proposal rejected notification:', error);
+    }
+    
+    return mapProposal(updated);
+  }
+
+  const index = demoProposals.findIndex((proposal) => proposal.id === proposalId);
+  if (index === -1) {
+    throw Object.assign(new Error('Proposal not found'), { statusCode: 404 });
+  }
+
+  demoProposals[index] = {
+    ...demoProposals[index],
+    status: 'REJECTED',
+    updatedAt: new Date().toISOString()
+  };
+  
+  // Notify proposer about rejection (demo mode)
+  try {
+    const gig = await getGigById(demoProposals[index].gigId);
+    if (gig) {
+      await notifyProposalRejected(demoProposals[index].proposerId, gig.title);
+    }
+  } catch (error) {
+    console.error('Error sending proposal rejected notification:', error);
+  }
+  
+  return demoProposals[index];
 }
 
 export async function listOrdersForUser(userId: string): Promise<OrderDTO[]> {

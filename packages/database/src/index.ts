@@ -78,14 +78,33 @@ const getDatabaseUrl = (): string => {
   return dbUrl;
 };
 
-const databaseUrl = getDatabaseUrl();
+// Lazy getter for database URL - only called when Prisma client is actually created
+// This prevents errors during module import if DATABASE_URL isn't loaded yet
+const getDatabaseUrlLazy = (): string => {
+  try {
+    return getDatabaseUrl();
+  } catch (error: any) {
+    // If DATABASE_URL isn't set during import, log warning but don't throw
+    // It will be checked again when Prisma client is actually used
+    console.warn('[database] DATABASE_URL not available during import:', error?.message);
+    // Return a placeholder - the actual error will be thrown when Prisma tries to connect
+    return process.env.DATABASE_URL || '';
+  }
+};
 
 // Connection retry helper
 const createPrismaClient = () => {
+  const dbUrl = getDatabaseUrlLazy();
+  
+  // Final check - throw error if DATABASE_URL is still not set
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL environment variable is not set. Please add it to your .env file.');
+  }
+  
   return new PrismaClient({
     datasources: {
       db: {
-        url: databaseUrl,
+        url: dbUrl,
       },
     },
     log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],

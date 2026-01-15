@@ -6,4 +6,6 @@ export * from './card';
 export * from './alert';
 export * from './modal';
 export * from './progress';
+export * from './textarea';
+export * from './input';
 

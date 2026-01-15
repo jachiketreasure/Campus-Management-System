@@ -232,10 +232,31 @@ export async function listStudentRecords(studentId: string): Promise<AttendanceR
 export async function qrCheckIn(input: QrCheckinInput): Promise<AttendanceRecordDTO> {
   if (usePrismaStore) {
     const session = await prisma.attendanceSession.findUnique({
-      where: { id: input.sessionId }
+      where: { id: input.sessionId },
+      include: {
+        course: {
+          select: {
+            id: true,
+            code: true,
+          },
+        },
+      },
     });
     if (!session) {
       throw Object.assign(new Error('Session not found'), { statusCode: 404 });
+    }
+
+    // Verify student is registered for this course
+    const { isStudentRegisteredForCourse } = await import('./student-access-control-service');
+    const courseId = (session as any).courseId;
+    const isRegistered = await isStudentRegisteredForCourse(input.studentId, courseId);
+    
+    if (!isRegistered) {
+      const courseCode = (session as any).course?.code || courseId;
+      throw Object.assign(
+        new Error(`You are not registered for course ${courseCode}. Please register for the course to mark attendance.`),
+        { statusCode: 403 }
+      );
     }
 
     const record = await prisma.attendanceRecord.upsert({

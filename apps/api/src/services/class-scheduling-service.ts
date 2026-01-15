@@ -632,7 +632,8 @@ export async function getClassDetails(sessionId: string, lecturerId: string): Pr
           student: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
             },
           },
         },
@@ -649,6 +650,7 @@ export async function getClassDetails(sessionId: string, lecturerId: string): Pr
   }
 
   // Get all students registered for this course
+  // Note: StudentCourse.student is a Visitor (has 'name'), not User
   const enrolledStudents = await prisma.studentCourse.findMany({
     where: { courseId: session.courseId },
     include: {
@@ -677,7 +679,7 @@ export async function getClassDetails(sessionId: string, lecturerId: string): Pr
       missedCount,
       records: session.records.map((record) => ({
         studentId: record.studentId,
-        studentName: record.student.name,
+        studentName: `${record.student.firstName || ''} ${record.student.lastName || ''}`.trim() || 'Unknown Student',
         status: record.status,
         checkInMethod: record.checkInMethod || 'QR_SCAN',
         checkedInAt: record.checkedInAt.toISOString(),
@@ -916,9 +918,9 @@ function mapSession(session: any): ClassSessionDTO {
     classTitle: session.classTitle || undefined,
     meetingPlatform: session.meetingPlatform || undefined,
     meetingLink:
-      session.classType === 'ONLINE' && session.classStartedAt
+      session.classType === 'ONLINE' && (session.status === 'OPEN' || session.classStartedAt)
         ? session.meetingLink || undefined
-        : undefined, // Only show link when class has started
+        : undefined, // Show link when class is OPEN or has started
     qrToken: session.qrToken || null,
     qrTokenHash: session.qrTokenHash || null,
     qrExpiresAt: session.qrExpiresAt?.toISOString() || null,

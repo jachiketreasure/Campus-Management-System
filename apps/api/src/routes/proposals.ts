@@ -9,6 +9,7 @@ import {
   createProposal,
   listProposalsForGig,
   acceptProposal,
+  rejectProposal,
   listOrdersForUser
 } from '../services/proposal-service';
 import { getGigById } from '../services/gig-service';
@@ -102,6 +103,39 @@ export const proposalsRoutes: FastifyPluginAsync = async (app) => {
         app.log.error(error);
         return reply.code(500).send({
           errors: [{ code: 'INTERNAL_ERROR', message: 'Unable to accept proposal' }]
+        });
+      }
+    }
+  );
+
+  app.post(
+    '/:proposalId/reject',
+    {
+      preHandler: authGuard
+    },
+    async (request, reply) => {
+      const user = request.authUser;
+      if (!user) {
+        return reply.code(401).send({
+          errors: [{ code: 'UNAUTHORIZED', message: 'Authentication required' }]
+        });
+      }
+
+      const params = z.object({ proposalId: z.string() }).parse(request.params);
+
+      try {
+        const proposal = await rejectProposal(params.proposalId);
+        return { data: proposal };
+      } catch (error) {
+        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 404) {
+          return reply.code(404).send({
+            errors: [{ code: 'NOT_FOUND', message: error.message }]
+          });
+        }
+
+        app.log.error(error);
+        return reply.code(500).send({
+          errors: [{ code: 'INTERNAL_ERROR', message: 'Unable to reject proposal' }]
         });
       }
     }

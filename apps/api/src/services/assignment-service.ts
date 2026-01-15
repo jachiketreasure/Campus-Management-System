@@ -1,5 +1,6 @@
 import { prisma } from '@cms/database';
 import { retryDbOperation } from '../utils/db-retry';
+import { createNotification } from './notification-service';
 
 /**
  * Automatically close assignments that have passed their due date
@@ -111,67 +112,78 @@ export async function getLecturerAssignments(lecturerId: string): Promise<Assign
     throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
   }
 
-  const assignments = await retryDbOperation(() =>
-    prisma.assignment.findMany({
-      where: {
-        lecturerId,
-      },
-      include: {
-        course: {
-          select: {
-            code: true,
-            title: true,
-          },
+  try {
+    const assignments = await retryDbOperation(() =>
+      prisma.assignment.findMany({
+        where: {
+          lecturerId,
         },
-        session: {
-          select: {
-            name: true,
+        include: {
+          course: {
+            select: {
+              code: true,
+              title: true,
+            },
           },
-        },
-        lecturer: {
-          select: {
-            name: true,
+          session: {
+            select: {
+              name: true,
+            },
           },
-        },
-        submissions: {
-          select: {
-            id: true,
-            status: true,
-            grade: {
-              select: {
-                id: true,
+          lecturer: {
+            select: {
+              name: true,
+            },
+          },
+          submissions: {
+            select: {
+              id: true,
+              status: true,
+              grade: {
+                select: {
+                  id: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-  );
+        orderBy: {
+          createdAt: 'desc',
+        },
+      })
+    );
 
-  return (assignments as any[]).map((assignment: any) => ({
-    id: assignment.id,
-    courseId: assignment.courseId,
-    courseCode: assignment.course?.code,
-    courseTitle: assignment.course?.title,
-    lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer?.name,
-    sessionId: assignment.sessionId,
-    sessionName: assignment.session?.name,
-    title: assignment.title,
-    description: assignment.description || undefined,
-    instructions: assignment.instructions || undefined,
-    dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
-    maxScore: Number(assignment.maxScore),
-    attachments: assignment.attachments,
-    status: assignment.status,
-    submissionCount: (assignment.submissions as any[])?.length || 0,
-    gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
-    createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
-    updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
-  }));
+    return (assignments as any[]).map((assignment: any) => ({
+      id: assignment.id,
+      courseId: assignment.courseId,
+      courseCode: assignment.course?.code,
+      courseTitle: assignment.course?.title,
+      lecturerId: assignment.lecturerId,
+      lecturerName: assignment.lecturer?.name || 'Unknown Lecturer',
+      sessionId: assignment.sessionId,
+      sessionName: assignment.session?.name || 'Unknown Session',
+      title: assignment.title,
+      description: assignment.description || undefined,
+      instructions: assignment.instructions || undefined,
+      dueDate: (assignment.dueDate as any)?.toISOString?.() || assignment.dueDate,
+      maxScore: Number(assignment.maxScore),
+      attachments: assignment.attachments || [],
+      status: assignment.status,
+      submissionCount: (assignment.submissions as any[])?.length || 0,
+      gradedCount: (assignment.submissions as any[])?.filter((s: any) => s.grade !== null).length || 0,
+      createdAt: (assignment.createdAt as any)?.toISOString?.() || assignment.createdAt,
+      updatedAt: (assignment.updatedAt as any)?.toISOString?.() || assignment.updatedAt,
+    }));
+  } catch (error: any) {
+    // Provide helpful error message for common issues
+    if (error.message?.includes('model') || error.message?.includes('not found') || error.message?.includes('Unknown field')) {
+      throw new Error('Database model error. Please run: npm run generate in the packages/database directory');
+    }
+    if (error.message?.includes('timeout') || error.message?.includes('connection') || error.message?.includes('ECONNREFUSED')) {
+      throw new Error('Database connection error. Please check your database connection and try again.');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -256,7 +268,7 @@ export async function getAssignmentById(assignmentId: string): Promise<Assignmen
     throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
   }
 
-  const assignment = await retryDbOperation(() =>
+  const assignment: any = await retryDbOperation(() =>
     prisma.assignment.findUnique({
       where: { id: assignmentId },
       include: {
@@ -322,99 +334,198 @@ export async function getAssignmentById(assignmentId: string): Promise<Assignmen
  * Create a new assignment
  */
 export async function createAssignment(lecturerId: string, input: CreateAssignmentInput): Promise<AssignmentDTO> {
-  // Check if Assignment model exists in Prisma client
-  if (!prisma.assignment) {
-    throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
-  }
+  try {
+    // Check if Assignment model exists in Prisma client
+    if (!prisma.assignment) {
+      throw new Error('Assignment model not found. Please run: cd packages/database && npm run generate');
+    }
 
-  // Get course to find its semester
-  const course = await retryDbOperation(() =>
-    prisma.course.findUnique({
-      where: { id: input.courseId },
-      select: { semester: true },
-    })
-  );
+    console.log('[assignment-service] Creating assignment:', { lecturerId, courseId: input.courseId, sessionId: input.sessionId });
 
-  if (!course) {
-    throw new Error('Course not found');
-  }
+    // Get course to find its semester
+    const course: any = await retryDbOperation(() =>
+      prisma.course.findUnique({
+        where: { id: input.courseId },
+        select: { semester: true },
+      })
+    );
 
-  // Verify lecturer is assigned to this course for the session and semester
-  const courseAssignment = await retryDbOperation(() =>
-    prisma.lecturerCourseAssignment.findFirst({
-      where: {
-        lecturerId,
-        courseId: input.courseId,
-        sessionId: input.sessionId,
-        status: 'ACTIVE',
-        // If course has a semester, check that the assignment matches
-        ...(course.semester ? { semester: course.semester } : {}),
-      },
-    })
-  );
+    if (!course) {
+      throw new Error('Course not found');
+    }
 
-  if (!courseAssignment) {
-    throw new Error('You are not assigned to this course for the selected session. Please contact an administrator to be assigned to the course.');
-  }
-
-  const assignment = await retryDbOperation(() =>
-    prisma.assignment.create({
-      data: {
-        courseId: input.courseId,
-        sessionId: input.sessionId,
-        lecturerId,
-        title: input.title,
-        description: input.description || null,
-        instructions: input.instructions || null,
-        dueDate: new Date(input.dueDate),
-        maxScore: input.maxScore || 100,
-        attachments: input.attachments || [],
-        status: 'DRAFT',
-      },
-      include: {
-        course: {
-          select: {
-            code: true,
-            title: true,
-          },
+    // Verify lecturer is assigned to this course for the session and semester
+    const courseAssignment = await retryDbOperation(() =>
+      prisma.lecturerCourseAssignment.findFirst({
+        where: {
+          lecturerId,
+          courseId: input.courseId,
+          sessionId: input.sessionId,
+          status: 'ACTIVE',
+          // If course has a semester, check that the assignment matches
+          ...(course.semester ? { semester: course.semester } : {}),
         },
-        session: {
-          select: {
-            name: true,
-          },
-        },
-        lecturer: {
-          select: {
-            name: true,
-          },
-        },
-        submissions: true,
-      },
-    })
-  );
+      })
+    );
 
-  const a = assignment as any;
-  return {
-    id: a.id,
-    courseId: a.courseId,
-    courseCode: a.course?.code,
-    courseTitle: a.course?.title,
-    lecturerId: a.lecturerId,
-    lecturerName: a.lecturer?.name,
-    sessionId: a.sessionId,
-    sessionName: a.session?.name,
-    title: a.title,
-    description: a.description || undefined,
-    instructions: a.instructions || undefined,
-    dueDate: a.dueDate?.toISOString?.() || a.dueDate,
-    maxScore: Number(a.maxScore),
-    attachments: a.attachments,
-    status: a.status,
-    submissionCount: 0,
-    gradedCount: 0,
-    createdAt: a.createdAt?.toISOString?.() || a.createdAt,
-    updatedAt: assignment.updatedAt.toISOString(),
-  };
+    if (!courseAssignment) {
+      throw new Error('You are not assigned to this course for the selected session. Please contact an administrator to be assigned to the course.');
+    }
+
+    console.log('[assignment-service] Course assignment verified, creating assignment...');
+
+    // Verify lecturer exists as a Visitor (required by Assignment model)
+    let lecturer = await retryDbOperation(() =>
+      prisma.visitor.findUnique({
+        where: { id: lecturerId },
+        select: { id: true, name: true },
+      })
+    );
+
+    if (!lecturer) {
+      // If lecturer doesn't exist as Visitor, check if they're a User and create a Visitor record
+      const user: any = await retryDbOperation(() =>
+        prisma.user.findUnique({
+          where: { id: lecturerId },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })
+      );
+
+      if (user) {
+        // Create a Visitor record for this User
+        const visitorName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown Lecturer';
+        // Generate a placeholder password hash (Visitor won't use this for login since they're a User)
+        // Using a bcrypt hash of a random string - this is just a placeholder
+        const placeholderHash = '$2b$10$PLACEHOLDERHASHFORUSERCREATEDVISITOR1234567890123456789012';
+        try {
+          const newVisitor: any = await retryDbOperation(() =>
+            prisma.visitor.create({
+              data: {
+                id: lecturerId, // Use same ID
+                name: visitorName,
+                email: user.email,
+                passwordHash: placeholderHash, // Placeholder - Visitor uses User authentication
+                visitorType: 'LECTURER',
+                status: 'ACTIVE',
+              },
+              select: { id: true, name: true },
+            })
+          );
+          lecturer = newVisitor;
+          console.log('[assignment-service] Created Visitor record for User:', newVisitor.id);
+        } catch (createError: any) {
+          // If Visitor already exists (race condition), fetch it
+          if (createError.code === 'P2002') {
+            lecturer = await retryDbOperation(() =>
+              prisma.visitor.findUnique({
+                where: { id: lecturerId },
+                select: { id: true, name: true },
+              })
+            );
+            console.log('[assignment-service] Visitor already exists, using existing record');
+          } else {
+            throw createError;
+          }
+        }
+      } else {
+        throw new Error(`Lecturer with ID ${lecturerId} not found. Please ensure you are properly registered as a lecturer.`);
+      }
+    }
+
+    if (!lecturer) {
+      throw new Error(`Unable to find or create Visitor record for lecturer ID ${lecturerId}`);
+    }
+
+    const assignment: any = await retryDbOperation(() =>
+      prisma.assignment.create({
+        data: {
+          courseId: input.courseId,
+          sessionId: input.sessionId,
+          lecturerId,
+          title: input.title,
+          description: input.description || null,
+          instructions: input.instructions || null,
+          dueDate: new Date(input.dueDate),
+          maxScore: input.maxScore || 100,
+          attachments: input.attachments || [],
+          status: 'DRAFT',
+        },
+        include: {
+          course: {
+            select: {
+              code: true,
+              title: true,
+            },
+          },
+          session: {
+            select: {
+              name: true,
+            },
+          },
+          lecturer: {
+            select: {
+              name: true,
+            },
+          },
+          submissions: true,
+        },
+      })
+    );
+
+    console.log('[assignment-service] Assignment created successfully:', assignment.id);
+
+    const a = assignment as any;
+    
+    // Handle lecturer name - Assignment.lecturer is a Visitor relation, so it should have 'name'
+    const lecturerName = a.lecturer?.name || 'Unknown Lecturer';
+    
+    return {
+      id: a.id,
+      courseId: a.courseId,
+      courseCode: a.course?.code,
+      courseTitle: a.course?.title,
+      lecturerId: a.lecturerId,
+      lecturerName,
+      sessionId: a.sessionId,
+      sessionName: a.session?.name,
+      title: a.title,
+      description: a.description || undefined,
+      instructions: a.instructions || undefined,
+      dueDate: a.dueDate?.toISOString?.() || a.dueDate,
+      maxScore: Number(a.maxScore),
+      attachments: a.attachments,
+      status: a.status,
+      submissionCount: 0,
+      gradedCount: 0,
+      createdAt: a.createdAt?.toISOString?.() || a.createdAt,
+      updatedAt: assignment.updatedAt.toISOString(),
+    };
+  } catch (error: any) {
+    console.error('[assignment-service] Error in createAssignment:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      meta: error.meta,
+    });
+    
+    // Provide helpful error messages
+    if (error.message?.includes('model') || error.message?.includes('not found') || error.message?.includes('Unknown field')) {
+      throw new Error('Database model error. Please run: npm run generate in the packages/database directory');
+    }
+    if (error.message?.includes('timeout') || error.message?.includes('connection') || error.message?.includes('ECONNREFUSED')) {
+      throw new Error('Database connection error. Please check your database connection and try again.');
+    }
+    if (error.code === 'P2002') {
+      throw new Error('A duplicate assignment already exists.');
+    }
+    if (error.code === 'P2003') {
+      throw new Error('Invalid reference: The course, session, or lecturer does not exist.');
+    }
+    
+    // Re-throw with original message if it's already a helpful error
+    throw error;
+  }
 }
 
 /**
@@ -431,10 +542,14 @@ export async function updateAssignment(
   }
 
   // Verify lecturer owns this assignment
-  const existing = await retryDbOperation(() =>
+  const existing: any = await retryDbOperation(() =>
     prisma.assignment.findUnique({
       where: { id: assignmentId },
-      select: { lecturerId: true },
+      select: { 
+        lecturerId: true,
+        status: true,
+        courseId: true,
+      },
     })
   );
 
@@ -455,6 +570,10 @@ export async function updateAssignment(
   if (input.attachments !== undefined) updateData.attachments = input.attachments;
   if (input.status !== undefined) updateData.status = input.status;
 
+  // Check if status is changing to PUBLISHED (for notifications)
+  const wasPublished = existing.status === 'PUBLISHED';
+  const isBeingPublished = input.status === 'PUBLISHED' && !wasPublished;
+
   const assignment = await retryDbOperation(() =>
     prisma.assignment.update({
       where: { id: assignmentId },
@@ -462,6 +581,7 @@ export async function updateAssignment(
       include: {
         course: {
           select: {
+            id: true,
             code: true,
             title: true,
           },
@@ -490,6 +610,99 @@ export async function updateAssignment(
       },
     })
   );
+
+  // If assignment is being published, notify all enrolled students
+  if (isBeingPublished) {
+    try {
+      // Get all students enrolled in this course
+      const enrollments = await retryDbOperation(() =>
+        prisma.enrollment.findMany({
+          where: {
+            courseId: assignment.courseId,
+            status: 'ACTIVE',
+          },
+          select: {
+            studentId: true,
+          },
+        })
+      );
+
+      // Also get students from StudentCourse table
+      const studentCourses = await retryDbOperation(() =>
+        prisma.studentCourse.findMany({
+          where: {
+            courseId: assignment.courseId,
+          },
+          select: {
+            studentId: true,
+          },
+        })
+      );
+
+      // Combine and deduplicate student IDs
+      const allStudentIds = [
+        ...new Set([
+          ...enrollments.map((e: any) => e.studentId),
+          ...studentCourses.map((sc: any) => sc.studentId),
+        ]),
+      ];
+
+      // Create notifications for all enrolled students
+      await Promise.all(
+        allStudentIds.map(async (studentId: string) => {
+          try {
+            // Check if student is a User or Visitor
+            const user = await prisma.user.findUnique({
+              where: { id: studentId },
+              select: { id: true },
+            });
+
+            if (user) {
+              // Student is a User
+              await createNotification(
+                studentId,
+                'New Assignment Published',
+                `A new assignment "${assignment.title}" has been published for ${assignment.course.code}. Due: ${new Date(assignment.dueDate).toLocaleDateString()}`,
+                'SYSTEM',
+                {
+                  type: 'ASSIGNMENT_PUBLISHED',
+                  assignmentId: assignment.id,
+                  assignmentTitle: assignment.title,
+                  courseCode: assignment.course.code,
+                  courseTitle: assignment.course.title,
+                  dueDate: assignment.dueDate,
+                }
+              );
+            } else {
+              // Student is a Visitor - create notification directly in Prisma
+              await prisma.notification.create({
+                data: {
+                  userId: studentId,
+                  title: 'New Assignment Published',
+                  body: `A new assignment "${assignment.title}" has been published for ${assignment.course.code}. Due: ${new Date(assignment.dueDate).toLocaleDateString()}`,
+                  category: 'SYSTEM',
+                  data: {
+                    type: 'ASSIGNMENT_PUBLISHED',
+                    assignmentId: assignment.id,
+                    assignmentTitle: assignment.title,
+                    courseCode: assignment.course.code,
+                    courseTitle: assignment.course.title,
+                    dueDate: assignment.dueDate,
+                  },
+                },
+              });
+            }
+          } catch (notifError) {
+            // Don't fail assignment update if notification fails
+            console.error(`[assignment-service] Failed to notify student ${studentId}:`, notifError);
+          }
+        })
+      );
+    } catch (error) {
+      // Don't fail assignment update if notification fails
+      console.error('[assignment-service] Error creating assignment notifications:', error);
+    }
+  }
 
   return {
     id: assignment.id,
@@ -863,6 +1076,62 @@ export async function returnGradedAssignment(submissionId: string, lecturerId: s
     throw new Error('Failed to retrieve updated submission');
   }
 
+  // Notify student that their grade has been returned
+  try {
+    const studentId = updatedSubmission.studentId;
+    const assignmentTitle = submission.assignment.title;
+    const grade = updatedSubmission.grade!;
+    const score = Number(grade.score);
+    const maxScore = Number(grade.maxScore);
+
+    // Check if student is a User or Visitor
+    const user = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
+
+    if (user) {
+      // Student is a User
+      await createNotification(
+        studentId,
+        'Grade Returned',
+        `Your grade for "${assignmentTitle}" has been returned. Score: ${score}/${maxScore}`,
+        'SYSTEM',
+        {
+          type: 'GRADE_RETURNED',
+          assignmentId: submission.assignment.id,
+          assignmentTitle,
+          submissionId,
+          score,
+          maxScore,
+          feedback: grade.feedback || undefined,
+        }
+      );
+    } else {
+      // Student is a Visitor - create notification directly in Prisma
+      await prisma.notification.create({
+        data: {
+          userId: studentId,
+          title: 'Grade Returned',
+          body: `Your grade for "${assignmentTitle}" has been returned. Score: ${score}/${maxScore}`,
+          category: 'SYSTEM',
+          data: {
+            type: 'GRADE_RETURNED',
+            assignmentId: submission.assignment.id,
+            assignmentTitle,
+            submissionId,
+            score,
+            maxScore,
+            feedback: grade.feedback || undefined,
+          },
+        },
+      });
+    }
+  } catch (notifError) {
+    // Don't fail grade return if notification fails
+    console.error('[assignment-service] Error creating grade notification:', notifError);
+  }
+
   return {
     id: updatedSubmission.id,
     assignmentId: updatedSubmission.assignmentId,
@@ -898,16 +1167,25 @@ export async function getStudentAssignments(
     throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
   }
 
-  // Automatically close overdue assignments
-  await closeOverdueAssignments();
-
-  // Get student's enrolled courses
-  const enrolledCourses = await retryDbOperation(() =>
+  // Get student's enrolled courses first (don't block on closing overdue assignments)
+  const enrolledCoursesPromise = retryDbOperation(() =>
     prisma.studentCourse.findMany({
       where: { studentId },
       select: { courseId: true },
     })
   );
+  
+  // Close overdue assignments in parallel (non-blocking)
+  const closeOverduePromise = closeOverdueAssignments().catch(err => {
+    console.error('[assignment-service] Error closing overdue assignments:', err);
+    return 0; // Don't fail if this errors
+  });
+  
+  // Wait for enrolled courses (required)
+  const enrolledCourses = await enrolledCoursesPromise;
+  
+  // Don't wait for closeOverduePromise - let it run in background
+  closeOverduePromise.catch(() => {}); // Suppress unhandled promise rejection
 
   if (enrolledCourses.length === 0) {
     return [];
@@ -979,23 +1257,9 @@ export async function getStudentAssignments(
     })
   );
 
-  console.log(`[getStudentAssignments] Found ${assignments.length} assignments for student ${studentId}`);
-
   return (assignments as any[]).map((assignment: any) => {
     // Get the most recent submission (should only be one due to unique constraint, but take first just in case)
     const studentSubmission = assignment.submissions.length > 0 ? assignment.submissions[0] : undefined;
-    
-    // Log for debugging
-    if (studentSubmission) {
-      console.log(`[getStudentAssignments] Found submission for assignment "${assignment.title}" (${assignment.id}):`, {
-        submissionId: studentSubmission.id,
-        status: studentSubmission.status,
-        hasGrade: !!studentSubmission.grade,
-        submittedAt: studentSubmission.submittedAt,
-      });
-    } else {
-      console.log(`[getStudentAssignments] No submission found for assignment "${assignment.title}" (${assignment.id})`);
-    }
     
     return {
       id: assignment.id,
@@ -1050,16 +1314,25 @@ export async function getStudentMissedAssignments(
     throw new Error('Assignment models not found. Please run: cd packages/database && npm run generate');
   }
 
-  // Automatically close overdue assignments first
-  await closeOverdueAssignments();
-
-  // Get student's enrolled courses
-  const enrolledCourses = await retryDbOperation(() =>
+  // Get student's enrolled courses first (don't block on closing overdue assignments)
+  const enrolledCoursesPromise = retryDbOperation(() =>
     prisma.studentCourse.findMany({
       where: { studentId },
       select: { courseId: true },
     })
   );
+  
+  // Close overdue assignments in parallel (non-blocking)
+  const closeOverduePromise = closeOverdueAssignments().catch(err => {
+    console.error('[assignment-service] Error closing overdue assignments:', err);
+    return 0; // Don't fail if this errors
+  });
+  
+  // Wait for enrolled courses (required)
+  const enrolledCourses = await enrolledCoursesPromise;
+  
+  // Don't wait for closeOverduePromise - let it run in background
+  closeOverduePromise.catch(() => {}); // Suppress unhandled promise rejection
 
   if (enrolledCourses.length === 0) {
     return [];

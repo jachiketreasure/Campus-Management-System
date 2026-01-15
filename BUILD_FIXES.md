@@ -78,6 +78,44 @@ These are acceptable for the build process and won't prevent deployment.
 
 ## 🔍 If Build Still Fails
 
+### Next.js 16 Blocking Route Errors
+
+**Error**: `Route "/auth/...": Uncached data was accessed outside of <Suspense>`
+
+**Cause**: Next.js 16's Partial Prerendering (PPR) blocks when `searchParams` or `getServerAuthSession()` is accessed directly in server components.
+
+**Solution**:
+```typescript
+// ❌ Before (blocking):
+export default async function Page({ searchParams }: Props) {
+  const params = await searchParams; // This blocks!
+  const session = await getServerAuthSession(); // This blocks!
+  return <Component />;
+}
+
+// ✅ After (non-blocking):
+async function PageWrapper(props: Props) {
+  const params = await searchParams;
+  const session = await getServerAuthSession();
+  return <Component />;
+}
+
+export default function Page(props: Props) {
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <PageWrapper {...props} />
+    </Suspense>
+  );
+}
+```
+
+**Applied to**:
+- `/auth/signin/student/page.tsx`
+- `/auth/signin/lecturer/page.tsx`
+- `/auth/signin/admin/page.tsx`
+- `/(dashboard)/layout.tsx` (dashboard layout)
+- `/dashboard/lecturer/exams/page.tsx`
+
 If you encounter new errors:
 1. Check the specific error message
 2. Look for missing type annotations

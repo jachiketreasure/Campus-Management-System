@@ -16,6 +16,8 @@ import {
   createExamAttempt,
   getExamAttempt,
   listExamAttemptsForStudent,
+  listExamAttemptsForExam,
+  listExamAttemptsForLecturer,
   updateExamAttempt,
   listExamNotificationsForUser,
   markNotificationAsSeen,
@@ -26,6 +28,8 @@ import {
   listVisitors,
   updateVisitor,
   deleteVisitor,
+  getExamQuestionsForStudent,
+  getExamQuestionsForLecturer,
 } from '../services/exam-integrity-service';
 
 const createExamSchema = z.object({
@@ -184,6 +188,8 @@ export const examIntegrityRoutes: FastifyPluginAsync = async (app) => {
     preHandler: authGuard
   }, async (request, reply) => {
     try {
+      const userId = (request as any).userId;
+      const userRole = (request as any).userRole;
       const params = z.object({ examId: z.string() }).parse(request.params);
       const exam = await getExamIntegrity(params.examId);
       
@@ -193,7 +199,25 @@ export const examIntegrityRoutes: FastifyPluginAsync = async (app) => {
         });
       }
       
-      return { data: exam };
+      // Remove correct answers from questions if user is not the lecturer who created the exam
+      if (userRole !== 'LECTURER' || exam.lecturerId !== userId) {
+        const questionsWithoutAnswers = await getExamQuestionsForStudent(params.examId);
+        return { 
+          data: {
+            ...exam,
+            questions: questionsWithoutAnswers
+          }
+        };
+      }
+
+      // Lecturer can see correct answers for their own exams
+      const questionsWithAnswers = await getExamQuestionsForLecturer(params.examId, userId);
+      return { 
+        data: {
+          ...exam,
+          questions: questionsWithAnswers
+        }
+      };
     } catch (error: any) {
       return reply.code(400).send({
         errors: [{ code: 'BAD_REQUEST', message: error.message }]
@@ -248,6 +272,72 @@ export const examIntegrityRoutes: FastifyPluginAsync = async (app) => {
     try {
       const params = z.object({ studentId: z.string() }).parse(request.params);
       const attempts = await listExamAttemptsForStudent(params.studentId);
+      return { data: attempts };
+    } catch (error: any) {
+      return reply.code(400).send({
+        errors: [{ code: 'BAD_REQUEST', message: error.message }]
+      });
+    }
+  });
+
+  app.get('/attempts/exam/:examId', {
+    preHandler: authGuard
+  }, async (request, reply) => {
+    try {
+      const userId = (request as any).userId;
+      const userRole = (request as any).userRole;
+      
+      // Only lecturers can view attempts for their exams
+      if (userRole !== 'LECTURER') {
+        return reply.code(403).send({
+          errors: [{ code: 'FORBIDDEN', message: 'Lecturer access required' }]
+        });
+      }
+
+      const params = z.object({ examId: z.string() }).parse(request.params);
+      
+      // Verify the lecturer owns this exam
+      const exam = await prisma.examIntegrity.findUnique({
+        where: { id: params.examId },
+        select: { lecturerId: true },
+      });
+
+      if (!exam) {
+        return reply.code(404).send({
+          errors: [{ code: 'NOT_FOUND', message: 'Exam not found' }]
+        });
+      }
+
+      if (exam.lecturerId !== userId) {
+        return reply.code(403).send({
+          errors: [{ code: 'FORBIDDEN', message: 'You can only view attempts for your own exams' }]
+        });
+      }
+
+      const attempts = await listExamAttemptsForExam(params.examId);
+      return { data: attempts };
+    } catch (error: any) {
+      return reply.code(400).send({
+        errors: [{ code: 'BAD_REQUEST', message: error.message }]
+      });
+    }
+  });
+
+  app.get('/attempts/lecturer/:lecturerId', {
+    preHandler: authGuard
+  }, async (request, reply) => {
+    try {
+      const userId = (request as any).userId;
+      const params = z.object({ lecturerId: z.string() }).parse(request.params);
+      
+      // Verify the lecturer is viewing their own attempts
+      if (userId !== params.lecturerId) {
+        return reply.code(403).send({
+          errors: [{ code: 'FORBIDDEN', message: 'You can only view your own exam attempts' }]
+        });
+      }
+
+      const attempts = await listExamAttemptsForLecturer(params.lecturerId);
       return { data: attempts };
     } catch (error: any) {
       return reply.code(400).send({

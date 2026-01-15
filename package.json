@@ -12,9 +12,12 @@
     "dev:api": "npm run dev --workspace api",
     "lint": "npm run lint --workspaces",
     "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces",
+    "generate": "npm run generate --workspace @cms/database",
+    "db:generate": "npm run generate --workspace @cms/database"
   },
   "dependencies": {
+    "critters": "^0.0.23",
     "mongodb": "^7.0.0"
   }
 }

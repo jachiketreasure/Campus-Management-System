@@ -376,6 +376,197 @@ export async function listExamContentsForReview(): Promise<ExamContentDTO[]> {
   return [];
 }
 
+export async function getExamContentBySession(examSessionId: string, allowNonApproved: boolean = false): Promise<ExamContentDTO | null> {
+  console.log(`[getExamContentBySession] usePrismaStore: ${usePrismaStore}, examSessionId: ${examSessionId}`);
+  
+  if (usePrismaStore) {
+    try {
+      // Verify Prisma client is available
+      if (!prisma) {
+        throw new Error('Prisma client is not initialized. Please check your database configuration.');
+      }
+
+      // Check DATABASE_URL is set
+      if (!process.env.DATABASE_URL) {
+        throw new Error('DATABASE_URL environment variable is not set. Please add it to your .env file.');
+      }
+
+      // Try to connect to database if not already connected
+      try {
+        console.log('[getExamContentBySession] Attempting to connect to database...');
+        await prisma.$connect();
+        console.log('[getExamContentBySession] Database connection successful');
+      } catch (connectError: any) {
+        console.error('[getExamContentBySession] Failed to connect to database');
+        console.error('[getExamContentBySession] Connection error type:', connectError?.constructor?.name);
+        console.error('[getExamContentBySession] Connection error message:', connectError?.message);
+        console.error('[getExamContentBySession] Connection error code:', connectError?.code);
+        console.error('[getExamContentBySession] Connection error name:', connectError?.name);
+        console.error('[getExamContentBySession] Connection error stack:', connectError?.stack);
+        
+        // If connection fails, provide helpful error message
+        const connectErrorMessage = connectError?.message || String(connectError);
+        const connectErrorCode = connectError?.code;
+        const connectErrorName = connectError?.name;
+        
+        if (connectErrorMessage.includes('Server selection timeout') || 
+            connectErrorMessage.includes('No available servers') ||
+            connectErrorMessage.includes('ECONNREFUSED') ||
+            connectErrorMessage.includes('ENOTFOUND') ||
+            connectErrorCode === 'ECONNREFUSED' ||
+            connectErrorCode === 'ENOTFOUND' ||
+            connectErrorName === 'MongoServerSelectionError' ||
+            connectErrorName === 'MongoNetworkError') {
+          const detailedError = new Error(
+            `Database connection failed (${connectErrorName || 'Unknown'}: ${connectErrorCode || 'no code'}). ${connectErrorMessage}\n\nPlease ensure:\n1. The database server is running\n2. DATABASE_URL is correctly set in your .env file\n3. Prisma client is generated (run: npm run generate in packages/database)\n4. Your IP address is whitelisted in MongoDB Atlas (if using Atlas)`
+          );
+          (detailedError as any).originalError = connectError;
+          throw detailedError;
+        }
+        throw connectError;
+      }
+
+      // Trim whitespace from examSessionId
+      const trimmedExamSessionId = examSessionId.trim();
+      
+      console.log('[getExamContentBySession] About to query database for examContent...');
+      console.log('[getExamContentBySession] Prisma client available:', !!prisma);
+      console.log('[getExamContentBySession] Prisma examContent model available:', typeof prisma.examContent !== 'undefined');
+      
+      // First, check if there's any content for this exam session (for debugging)
+      let allContent;
+      try {
+        console.log('[getExamContentBySession] Executing findMany query...');
+        allContent = await prisma.examContent.findMany({
+          where: {
+            examSessionId: trimmedExamSessionId
+          },
+          orderBy: { submittedAt: 'desc' }
+        });
+        console.log('[getExamContentBySession] Query completed successfully');
+      } catch (queryError: any) {
+        console.error('[getExamContentBySession] Query failed with error:', queryError);
+        console.error('[getExamContentBySession] Query error details:', {
+          message: queryError?.message,
+          name: queryError?.name,
+          code: queryError?.code,
+          meta: queryError?.meta
+        });
+        throw queryError; // Re-throw to be caught by outer catch
+      }
+
+      console.log(`[getExamContentBySession] Looking for examSessionId: "${trimmedExamSessionId}" (original: "${examSessionId}")`);
+      console.log(`[getExamContentBySession] Found ${allContent.length} content records for this exam session`);
+      
+      // Also check if the exam session exists
+      try {
+        const examSession = await prisma.examSession.findUnique({
+          where: { id: trimmedExamSessionId },
+          select: { id: true, title: true, status: true }
+        });
+        console.log(`[getExamContentBySession] Exam session exists:`, examSession ? { id: examSession.id, title: examSession.title, status: examSession.status } : 'NOT FOUND');
+      } catch (sessionError: any) {
+        console.error(`[getExamContentBySession] Error checking exam session:`, sessionError?.message);
+      }
+      
+      if (allContent.length > 0) {
+        console.log(`[getExamContentBySession] Content statuses:`, allContent.map(c => ({ 
+          id: c.id, 
+          status: c.status, 
+          title: c.title,
+          examSessionId: c.examSessionId 
+        })));
+      } else {
+        // Check if there's ANY exam content in the database (for debugging)
+        try {
+          const allExamContent = await prisma.examContent.findMany({
+            take: 5,
+            select: { id: true, examSessionId: true, title: true, status: true }
+          });
+          console.log(`[getExamContentBySession] Sample exam content in database (first 5):`, allExamContent);
+        } catch (debugError: any) {
+          console.error(`[getExamContentBySession] Error fetching sample content:`, debugError?.message);
+        }
+      }
+
+      // Try to find approved content first
+      const approvedContent = await prisma.examContent.findFirst({
+        where: {
+          examSessionId: trimmedExamSessionId,
+          status: 'APPROVED'
+        },
+        orderBy: { approvedAt: 'desc' }
+      });
+
+      if (approvedContent) {
+        console.log(`[getExamContentBySession] Found approved content: ${approvedContent.id}`);
+        return mapExamContent(approvedContent);
+      }
+
+      // If no approved content but allowNonApproved is true, return the latest content
+      if (allowNonApproved && allContent.length > 0) {
+        const latestContent = allContent[0];
+        console.log(`[getExamContentBySession] Returning non-approved content (status: ${latestContent.status}) for debugging`);
+        return mapExamContent(latestContent);
+      }
+
+      // If no approved content, check if there's any content at all (for better error messages)
+      if (allContent.length > 0) {
+        const latestContent = allContent[0];
+        console.log(`[getExamContentBySession] Found content but status is ${latestContent.status}, not APPROVED`);
+        console.log(`[getExamContentBySession] Content examSessionId: "${latestContent.examSessionId}" vs searched: "${trimmedExamSessionId}"`);
+      } else {
+        console.log(`[getExamContentBySession] No content found at all for examSessionId: "${trimmedExamSessionId}"`);
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error('[getExamContentBySession] Database error occurred');
+      console.error('[getExamContentBySession] Error type:', error?.constructor?.name);
+      console.error('[getExamContentBySession] Error message:', error?.message);
+      console.error('[getExamContentBySession] Error code:', error?.code);
+      console.error('[getExamContentBySession] Error name:', error?.name);
+      console.error('[getExamContentBySession] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('[getExamContentBySession] Error stack:', error?.stack);
+      
+      const errorMessage = error?.message || String(error);
+      const errorCode = error?.code;
+      const errorName = error?.name;
+      
+      // Log the original error details before wrapping
+      console.error('[getExamContentBySession] Original error details:', {
+        message: errorMessage,
+        code: errorCode,
+        name: errorName,
+        type: error?.constructor?.name
+      });
+      
+      // If it's already a formatted error message, re-throw it
+      if (errorMessage.includes('Database connection error') || errorMessage.includes('DATABASE_URL')) {
+        throw error;
+      }
+      
+      // Re-throw with more context for other database errors, but include original error details
+      if (errorMessage.includes('prisma') || errorMessage.includes('Prisma') || 
+          errorMessage.includes('connection') || errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ENOTFOUND') ||
+          errorCode === 'ECONNREFUSED' || errorCode === 'ENOTFOUND' ||
+          errorName === 'MongoServerSelectionError' || errorName === 'MongoNetworkError') {
+        const detailedError = new Error(
+          `Database connection error (${errorName || 'Unknown'}: ${errorCode || 'no code'}). Original: ${errorMessage}\n\nPlease ensure:\n1. The database server is running\n2. DATABASE_URL is correctly set in your .env file\n3. Prisma client is generated (run: npm run generate in packages/database)\n4. Your IP address is whitelisted in MongoDB Atlas (if using Atlas)`
+        );
+        (detailedError as any).originalError = error;
+        throw detailedError;
+      }
+      throw error;
+    }
+  }
+
+  // Demo implementation
+  console.log(`[getExamContentBySession] usePrismaStore is false, returning null (demo mode)`);
+  return null;
+}
+
 export async function reviewExamContent(
   contentId: string,
   reviewerId: string,

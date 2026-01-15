@@ -16,6 +16,7 @@ import {
   submitExamContent,
   listExamContentsForReview,
   reviewExamContent,
+  getExamContentBySession,
   // Student Verification
   getOrCreateStudentVerification,
   updateStudentVerification,
@@ -225,6 +226,45 @@ export const examsRoutes: FastifyPluginAsync = async (app) => {
 
     const contents = await listExamContentsForReview();
     return { data: contents };
+  });
+
+  // Get exam content for a specific exam session (for students)
+  // This route must come after /content/review but before other /:examId routes
+  app.get('/:examId/content', {
+    preHandler: authGuard
+  }, async (request, reply) => {
+    try {
+      const params = z.object({ examId: z.string() }).parse(request.params);
+      const user = request.authUser;
+
+      // Allow students to access approved exam content
+      if (!user?.roles.includes('STUDENT') && !user?.roles.includes('ADMIN') && !user?.roles.includes('LECTURER')) {
+        return reply.code(403).send({
+          errors: [{ code: 'FORBIDDEN', message: 'Access denied' }]
+        });
+      }
+
+      const content = await getExamContentBySession(params.examId);
+      if (!content) {
+        return reply.code(404).send({
+          errors: [{ code: 'NOT_FOUND', message: 'Exam content not found for this exam session' }]
+        });
+      }
+
+      // Only return approved content to students
+      if (user?.roles.includes('STUDENT') && content.status !== 'APPROVED') {
+        return reply.code(404).send({
+          errors: [{ code: 'NOT_FOUND', message: 'Exam content is not available yet' }]
+        });
+      }
+
+      return { data: content };
+    } catch (error) {
+      console.error('Error in /:examId/content route:', error);
+      return reply.code(500).send({
+        errors: [{ code: 'INTERNAL_ERROR', message: 'Failed to fetch exam content' }]
+      });
+    }
   });
 
   app.put('/content/:contentId/review', {

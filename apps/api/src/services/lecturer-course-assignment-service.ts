@@ -58,7 +58,8 @@ export async function getAvailableCoursesForAssignment(sessionId: string, semest
           lecturer: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -87,7 +88,7 @@ export async function getAvailableCoursesForAssignment(sessionId: string, semest
       isAssigned: !!activeAssignment,
       assignedLecturerId: activeAssignment?.lecturerId,
       assignedLecturerName: activeAssignment
-        ? activeAssignment.lecturer.name
+        ? `${activeAssignment.lecturer.firstName || ''} ${activeAssignment.lecturer.lastName || ''}`.trim() || 'Unknown'
         : undefined,
     };
   });
@@ -267,6 +268,7 @@ export async function assignLecturerToCourse(
     include: {
       lecturer: {
         select: {
+          id: true,
           firstName: true,
           lastName: true,
           email: true,
@@ -279,10 +281,15 @@ export async function assignLecturerToCourse(
     },
   });
 
+  // Handle both User and Visitor models for lecturer
+  const lecturerName = (assignment.lecturer as any).name || 
+    `${(assignment.lecturer as any).firstName || ''} ${(assignment.lecturer as any).lastName || ''}`.trim() || 
+    'Unknown Lecturer';
+
   return {
     id: assignment.id,
     lecturerId: assignment.lecturerId,
-    lecturerName: assignment.lecturer.name,
+    lecturerName,
     lecturerEmail: assignment.lecturer.email,
     courseId: assignment.courseId,
     courseCode: assignment.course.code,
@@ -335,7 +342,8 @@ export async function getCourseLecturer(courseId: string, sessionId: string, sem
           lecturer: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -346,9 +354,14 @@ export async function getCourseLecturer(courseId: string, sessionId: string, sem
     return null;
   }
 
+  // Handle both User and Visitor models
+  const lecturerName = (assignment.lecturer as any).name || 
+    `${(assignment.lecturer as any).firstName || ''} ${(assignment.lecturer as any).lastName || ''}`.trim() || 
+    'Unknown Lecturer';
+
   return {
     id: assignment.lecturer.id,
-    name: assignment.lecturer.name,
+    name: lecturerName,
     email: assignment.lecturer.email,
   };
 }

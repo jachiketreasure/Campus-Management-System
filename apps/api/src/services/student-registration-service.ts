@@ -60,12 +60,30 @@ export async function saveStudentRegistration(
     registrationNumber: string;
     academicLevel: string;
     courseIds: string[];
+    semester?: string; // Add semester to registration data
   },
   visitorInfo?: {
     email?: string;
     name?: string;
   }
 ) {
+  // Validate level and semester registration before proceeding
+  const { validateCourseRegistration } = await import('./student-level-validation-service');
+  
+  // Get semester from course data or default to First
+  const semester = data.semester || 'First';
+  
+  const validation = await validateCourseRegistration(
+    studentId,
+    data.sessionId,
+    data.academicLevel,
+    semester
+  );
+
+  if (!validation.allowed) {
+    throw new Error(validation.reason || 'Registration not allowed for this level and semester combination.');
+  }
+
   // Check if visitor exists
   let visitor = await retryDbOperation(() =>
     prisma.visitor.findUnique({
@@ -287,14 +305,87 @@ export async function getStudentCourses(studentId: string) {
 
 export async function getAvailableCourses(level?: string, semester?: string, sessionId?: string) {
   const where: any = {};
+  
+  // Build strict AND conditions - both level and semester must match exactly
+  const conditions: any[] = [];
+  
   if (level) {
-    where.level = level;
+    // Extract just the number from the level (e.g., "200" from "200" or "200 Level")
+    const normalizedLevel = level.replace(/[^0-9]/g, ''); // Extract just the number: "200"
+    
+    // Only match exact level variations - be very strict to avoid matching "100" when searching for "200"
+    // Match: "200", "200L", "200 Level", "200L Level" - but NOT "100", "100L", etc.
+    const levelVariations = [
+      normalizedLevel,          // "200" - exact number match
+      `${normalizedLevel}L`,   // "200L"
+      `${normalizedLevel} Level`, // "200 Level"
+      `${normalizedLevel}L Level`, // "200L Level" (if stored this way)
+    ];
+    
+    // Remove duplicates
+    const uniqueLevels = [...new Set(levelVariations)];
+    
+    // Use OR to match any of the level formats, but must match EXACTLY
+    // This ensures "200" doesn't match "100" or "300"
+    conditions.push({
+      AND: [
+        {
+          OR: uniqueLevels.map(lvl => ({ level: lvl }))
+        },
+        {
+          level: { not: null }
+        },
+        {
+          level: { not: '' }
+        }
+      ]
+    });
+  } else {
+    // If no level specified, still exclude null/empty levels
+    conditions.push({
+      level: { not: null }
+    });
+    conditions.push({
+      level: { not: '' }
+    });
   }
+  
   if (semester) {
-    where.semester = semester;
+    // Normalize semester - handle different case and format variations
+    const semesterLower = semester.toLowerCase();
+    const isFirst = semesterLower.includes('first');
+    const isSecond = semesterLower.includes('second');
+    
+    let semesterVariations: string[] = [semester]; // Original
+    
+    if (isFirst) {
+      semesterVariations.push('First', 'FIRST', 'first', 'First Semester');
+    } else if (isSecond) {
+      semesterVariations.push('Second', 'SECOND', 'second', 'Second Semester');
+    }
+    
+    // Remove duplicates
+    const uniqueSemesters = [...new Set(semesterVariations)];
+    
+    // Use OR to match any of the semester formats, but must match exactly
+    conditions.push({
+      OR: uniqueSemesters.map(sem => ({ semester: sem }))
+    });
   }
+  
   if (sessionId) {
-    where.sessionId = sessionId;
+    // Session can be the specific sessionId OR null (available across all sessions)
+    conditions.push({
+      OR: [
+        { sessionId: sessionId },
+        { sessionId: null }
+      ]
+    });
+  }
+  
+  // Combine all conditions with AND - all must be true
+  if (conditions.length > 0) {
+    where.AND = conditions;
   }
 
   // Log the query for debugging
@@ -318,8 +409,27 @@ export async function getAvailableCourses(level?: string, semester?: string, ses
   );
 
   console.log(`✅ Found ${courses.length} courses matching filters`);
+  console.log(`📋 Courses returned:`, courses.map(c => ({ code: c.code, level: c.level, semester: c.semester })));
+  
+  // Additional client-side filtering to ensure strict level matching
+  // This is a safety net in case the database query doesn't work as expected
+  let filteredCourses = courses;
+  if (level) {
+    const normalizedLevel = level.replace(/[^0-9]/g, '');
+    filteredCourses = courses.filter(course => {
+      if (!course.level) return false;
+      const courseLevel = course.level.replace(/[^0-9]/g, '');
+      // Only include courses where the level number matches exactly
+      return courseLevel === normalizedLevel;
+    });
+    
+    if (filteredCourses.length !== courses.length) {
+      console.warn(`⚠️ Filtered out ${courses.length - filteredCourses.length} courses that didn't match level ${normalizedLevel} exactly`);
+      console.log(`📋 Filtered courses:`, filteredCourses.map(c => ({ code: c.code, level: c.level, semester: c.semester })));
+    }
+  }
 
-  return courses;
+  return filteredCourses;
 }
 
 /**

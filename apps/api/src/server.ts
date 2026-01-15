@@ -11,6 +11,11 @@ import { authRoutes } from './routes/auth';
 import { gigsRoutes } from './routes/gigs';
 import { proposalsRoutes } from './routes/proposals';
 import { walletRoutes } from './routes/wallet';
+import { applicationsRoutes } from './routes/applications';
+import { contractsRoutes } from './routes/contracts';
+import { gradesRoutes } from './routes/grades';
+import { lecturerAbsenceRoutes } from './routes/lecturer-absence';
+import { pdfResultsRoutes } from './routes/pdf-results';
 import { attendanceRoutes } from './routes/attendance';
 import { examsRoutes } from './routes/exams';
 import { examIntegrityRoutes } from './routes/exam-integrity';
@@ -23,6 +28,8 @@ import { assignmentsRoutes } from './routes/assignments';
 import { registrationNumberRoutes } from './routes/registration-numbers';
 import { aliveCheckRoutes } from './routes/alive-checks';
 import { classSchedulingRoutes } from './routes/class-scheduling';
+import { notificationsRoutes } from './routes/notifications';
+import { reportsRoutes } from './routes/reports';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -69,6 +76,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(gigsRoutes, { prefix: '/gigs' });
   await app.register(proposalsRoutes, { prefix: '/proposals' });
   await app.register(walletRoutes, { prefix: '/wallet' });
+  await app.register(applicationsRoutes, { prefix: '/applications' });
+  await app.register(contractsRoutes, { prefix: '/contracts' });
+  await app.register(gradesRoutes, { prefix: '/grades' });
+  await app.register(lecturerAbsenceRoutes, { prefix: '/lecturer-absence' });
+  await app.register(pdfResultsRoutes, { prefix: '/pdf' });
   await app.register(attendanceRoutes, { prefix: '/attendance' });
   await app.register(examsRoutes, { prefix: '/exams' });
   await app.register(examIntegrityRoutes, { prefix: '/api' });
@@ -81,6 +93,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(registrationNumberRoutes, { prefix: '/api/registration-numbers' });
   await app.register(aliveCheckRoutes, { prefix: '/api/alive-checks' });
   await app.register(classSchedulingRoutes, { prefix: '/api' });
+  await app.register(notificationsRoutes, { prefix: '/notifications' });
+  await app.register(reportsRoutes, { prefix: '/reports' });
 
   app.get('/', async () => ({ status: 'ok' }));
 

@@ -46,40 +46,7 @@ export type GigDTO = {
   updatedAt: string;
 };
 
-const demoGigs: GigDTO[] = [
-  {
-    id: 'demo-gig-1',
-    ownerId: 'demo-student',
-    title: 'Campus Portal UI Refresh',
-    description:
-      'Design a responsive, accessible UI refresh for the campus management portal with modern UI library recommendations.',
-    category: 'Design',
-    price: 45000,
-    currency: 'NGN',
-    deliveryTimeDays: 7,
-    attachments: [],
-    tags: ['design', 'ui', 'figma'],
-    status: 'ACTIVE',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
-  },
-  {
-    id: 'demo-gig-2',
-    ownerId: 'demo-student',
-    title: 'Proctoring Report Automation',
-    description:
-      'Build a script to summarize exam malpractice events into a PDF report using provided API endpoints.',
-    category: 'Automation',
-    price: 60000,
-    currency: 'NGN',
-    deliveryTimeDays: 5,
-    attachments: [],
-    tags: ['automation', 'python', 'reports'],
-    status: 'ACTIVE',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-  }
-];
+const demoGigs: GigDTO[] = [];
 
 type GigRecord = {
   id: string;

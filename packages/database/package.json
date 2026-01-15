@@ -25,6 +25,7 @@
     "fix-user-admin": "tsx src/fix-user-admin-role.ts",
     "init-staff-ids": "tsx src/init-staff-ids.ts",
     "migrate-staff-ids": "tsx src/migrate-staff-ids.ts",
+    "create-indexes": "tsx src/create-dashboard-indexes.ts",
     "build": "tsc -p tsconfig.json",
     "clean": "rimraf dist",
     "test": "echo \"No tests yet\""

@@ -127,8 +127,9 @@ export const classSchedulingRoutes: FastifyPluginAsync = async (app) => {
         return { data: details };
       } catch (error: any) {
         app.log.error(error);
-        return reply.code(404).send({
-          errors: [{ code: 'NOT_FOUND', message: error.message || 'Class not found' }],
+        const statusCode = error.message?.includes('not found') ? 404 : 500;
+        return reply.code(statusCode).send({
+          errors: [{ code: statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR', message: error.message || 'Failed to fetch class details' }],
         });
       }
     }
