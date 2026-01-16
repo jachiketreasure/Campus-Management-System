@@ -356,7 +356,7 @@ export async function getAvailableCourses(level?: string, semester?: string, ses
     const isFirst = semesterLower.includes('first');
     const isSecond = semesterLower.includes('second');
     
-    let semesterVariations: string[] = [semester]; // Original
+    const semesterVariations: string[] = [semester]; // Original
     
     if (isFirst) {
       semesterVariations.push('First', 'FIRST', 'first', 'First Semester');

@@ -203,7 +203,7 @@ export const gradesRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: grade };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 400) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 400) {
           return reply.code(400).send({
             errors: [{ code: 'BAD_REQUEST', message: error.message }]
           });

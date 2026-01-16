@@ -196,7 +196,6 @@ export async function autoGenerateRegistrationNumbers(
         registrationNumber: regNumber,
         isUsed: false,
       })),
-      skipDuplicates: true,
     });
 
     const newAvailableCount = await getAvailableRegistrationNumberCount();

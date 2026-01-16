@@ -712,7 +712,7 @@ export async function listStudentClasses(studentId: string): Promise<Array<{
   }
 
   // Get all classes for these courses
-  const sessions = await retryDbOperation(() =>
+  const sessions: any = await retryDbOperation(() =>
     prisma.attendanceSession.findMany({
       where: {
         courseId: { in: courseIds },

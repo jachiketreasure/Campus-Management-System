@@ -94,7 +94,7 @@ export const proposalsRoutes: FastifyPluginAsync = async (app) => {
         const order = await acceptProposal(body.proposalId, body.buyerId, user.id);
         return reply.code(201).send({ data: order });
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 404) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 404) {
           return reply.code(404).send({
             errors: [{ code: 'NOT_FOUND', message: error.message }]
           });
@@ -127,7 +127,7 @@ export const proposalsRoutes: FastifyPluginAsync = async (app) => {
         const proposal = await rejectProposal(params.proposalId);
         return { data: proposal };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 404) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 404) {
           return reply.code(404).send({
             errors: [{ code: 'NOT_FOUND', message: error.message }]
           });

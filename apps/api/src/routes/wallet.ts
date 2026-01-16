@@ -155,8 +155,8 @@ export const walletRoutes: FastifyPluginAsync = async (app) => {
         const transaction = await depositToEscrow(body.contractId, user.id, body.amount);
         return { data: transaction };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode) {
-          const statusCode = (error as { statusCode: number }).statusCode;
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode) {
+          const statusCode = (error as unknown as { statusCode: number }).statusCode;
           if (statusCode === 403) {
             return reply.code(403).send({
               errors: [{ code: 'FORBIDDEN', message: error.message }]

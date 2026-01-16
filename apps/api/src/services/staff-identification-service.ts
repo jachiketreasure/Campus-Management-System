@@ -184,7 +184,6 @@ export async function autoGenerateStaffIdentificationNumbers(
         staffIdentificationNumber: staffId,
         isUsed: false,
       })),
-      skipDuplicates: true,
     });
 
     const newAvailableCount = await getAvailableStaffIdentificationNumberCount();

@@ -117,7 +117,7 @@ export const attendanceRoutes: FastifyPluginAsync = async (app) => {
 
       return reply.code(200).send({ data: record });
     } catch (error) {
-      if (error instanceof Error && (error as { statusCode?: number }).statusCode === 404) {
+      if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 404) {
         return reply.code(404).send({
           errors: [{ code: 'NOT_FOUND', message: error.message }]
         });

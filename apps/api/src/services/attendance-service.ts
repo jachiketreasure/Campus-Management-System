@@ -172,7 +172,7 @@ export async function createSession(
     const session = await prisma.attendanceSession.create({
       data: {
         ...payload,
-        metadata: payload.metadata
+        metadata: payload.metadata as any
       }
     });
     return mapSession(session);

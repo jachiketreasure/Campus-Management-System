@@ -121,7 +121,7 @@ export const gigsRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: gig };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 403) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 403) {
           return reply.code(403).send({
             errors: [{ code: 'FORBIDDEN', message: 'Not allowed to update this gig' }]
           });

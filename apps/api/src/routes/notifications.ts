@@ -82,7 +82,7 @@ export const notificationsRoutes: FastifyPluginAsync = async (app) => {
         const notification = await markAsRead(params.notificationId, user.id);
         return { data: notification };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 404) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 404) {
           return reply.code(404).send({
             errors: [{ code: 'NOT_FOUND', message: 'Notification not found' }]
           });

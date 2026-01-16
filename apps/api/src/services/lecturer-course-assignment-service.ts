@@ -58,8 +58,7 @@ export async function getAvailableCoursesForAssignment(sessionId: string, semest
           lecturer: {
             select: {
               id: true,
-              firstName: true,
-              lastName: true,
+              name: true,
               email: true,
             },
           },
@@ -256,7 +255,7 @@ export async function assignLecturerToCourse(
   }
 
   // Create new assignment
-  const assignment = await prisma.lecturerCourseAssignment.create({
+  const assignment: any = await prisma.lecturerCourseAssignment.create({
     data: {
       lecturerId,
       courseId,
@@ -269,8 +268,7 @@ export async function assignLecturerToCourse(
       lecturer: {
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
+          name: true,
           email: true,
         },
       },
@@ -307,8 +305,17 @@ export async function assignLecturerToCourse(
  * Remove lecturer assignment from a course
  */
 export async function removeLecturerAssignment(assignmentId: string, lecturerId: string) {
-  const assignment = await prisma.lecturerCourseAssignment.findUnique({
+  const assignment: any = await prisma.lecturerCourseAssignment.findUnique({
     where: { id: assignmentId },
+    include: {
+      lecturer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 
   if (!assignment) {
@@ -342,8 +349,7 @@ export async function getCourseLecturer(courseId: string, sessionId: string, sem
           lecturer: {
             select: {
               id: true,
-              firstName: true,
-              lastName: true,
+              name: true,
               email: true,
             },
           },

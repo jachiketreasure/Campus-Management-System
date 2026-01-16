@@ -168,7 +168,7 @@ export const applicationsRoutes: FastifyPluginAsync = async (app) => {
 
         return { data: application };
       } catch (error) {
-        if (error instanceof Error && (error as { statusCode?: number }).statusCode === 403) {
+        if (error instanceof Error && (error as unknown as { statusCode?: number }).statusCode === 403) {
           return reply.code(403).send({
             errors: [{ code: 'FORBIDDEN', message: error.message }]
           });

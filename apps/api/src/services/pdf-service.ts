@@ -1,4 +1,4 @@
-import { getStudentGrades, type CourseGradeDTO } from './grade-service';
+import { getStudentGrades, type CourseGradeDTO, type GradeComponent } from './grade-service';
 import { prisma } from '@cms/database';
 
 const usePrismaStore = process.env.NEXTAUTH_USE_PRISMA === 'true';
@@ -15,8 +15,8 @@ export type StudentResultPDFData = {
     id: string;
     name: string;
   };
-  grades: CourseGrade[];
-  cgpa: CGPABreakdown;
+  grades: CourseGradeDTO[];
+  cgpa: { cgpa: number; cumulativeUnits: number; cumulativeGradePoints: number; classification: string };
   generatedAt: string;
 };
 
@@ -42,7 +42,13 @@ export async function getStudentResultData(studentId: string, sessionId?: string
   }
 
   const grades = await getStudentGrades(studentId, sessionId);
-  const cgpa = await getCGPA(studentId);
+  // TODO: Implement proper CGPA calculation
+  const cgpa = {
+    cgpa: 0,
+    cumulativeUnits: 0,
+    cumulativeGradePoints: 0,
+    classification: 'Not calculated'
+  };
 
   const session = sessionId && usePrismaStore
     ? await prisma.academicSession.findUnique({
@@ -83,7 +89,7 @@ export function generateResultPDFHTML(data: StudentResultPDFData): string {
     }
     acc[key].push(grade);
     return acc;
-  }, {} as Record<string, CourseGrade[]>);
+  }, {} as Record<string, CourseGradeDTO[]>);
 
   const formatScore = (score: number | null | undefined): string => {
     if (score === null || score === undefined) return '—';
@@ -283,7 +289,7 @@ export function generateResultPDFHTML(data: StudentResultPDFData): string {
     </div>
   </div>
 
-  ${Object.entries(gradesBySemester).map(([key, semesterGrades]) => {
+  ${(Object.entries(gradesBySemester) as [string, CourseGradeDTO[]][]).map(([key, semesterGrades]) => {
     const [sessionId, semester] = key.split('-');
     return `
       <div class="semester-header">${semester} Semester</div>
@@ -327,18 +333,7 @@ export function generateResultPDFHTML(data: StudentResultPDFData): string {
       ACADEMIC PERFORMANCE SUMMARY
     </div>
     
-    <!-- Current Semester GPA -->
-    ${cgpa.sessions.length > 0 ? `
-    <div style="background: #eff6ff; padding: 12px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
-      <div class="gpa-row" style="margin-bottom: 5px;">
-        <span class="gpa-label" style="font-weight: 600;">Current Semester GPA:</span>
-        <span class="gpa-value" style="color: #2563eb; font-size: 18px;">${cgpa.sessions[cgpa.sessions.length - 1]?.gpa.toFixed(2) || 'N/A'}</span>
-      </div>
-      <div style="font-size: 10px; color: #64748b; margin-top: 5px;">
-        ${cgpa.sessions[cgpa.sessions.length - 1]?.semester || 'N/A'} Semester • ${cgpa.sessions[cgpa.sessions.length - 1]?.totalUnits || 0} Units
-      </div>
-    </div>
-    ` : ''}
+    <!-- CGPA Section -->
     
     <!-- CGPA Section -->
     <div style="background: #f0fdf4; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #10b981;">

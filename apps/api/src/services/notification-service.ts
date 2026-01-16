@@ -100,7 +100,7 @@ export async function listNotifications(
   }
 ): Promise<NotificationDTO[]> {
   if (usePrismaStore) {
-    const where: Prisma.NotificationWhereInput = {
+    const where: any = {
       userId,
     };
     if (options?.category) {

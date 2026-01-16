@@ -574,7 +574,7 @@ export async function updateAssignment(
   const wasPublished = existing.status === 'PUBLISHED';
   const isBeingPublished = input.status === 'PUBLISHED' && !wasPublished;
 
-  const assignment = await retryDbOperation(() =>
+  const assignment: any = await retryDbOperation(() =>
     prisma.assignment.update({
       where: { id: assignmentId },
       data: updateData,
@@ -1563,7 +1563,7 @@ export async function submitAssignment(
   }
 
   // Verify assignment exists and is published
-  const assignment = await retryDbOperation(() =>
+  const assignment: any = await retryDbOperation(() =>
     prisma.assignment.findUnique({
       where: { id: assignmentId },
       select: {

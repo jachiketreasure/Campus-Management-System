@@ -9,7 +9,7 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/ready', async () => {
     try {
-      await prisma.$queryRaw`SELECT 1`;
+      await (prisma as any).$queryRaw`SELECT 1`;
       return {
         status: 'ready',
         timestamp: new Date().toISOString()
